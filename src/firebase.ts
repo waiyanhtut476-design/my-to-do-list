@@ -1,13 +1,35 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+import defaultFirebaseConfig from '../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
-// CRITICAL: The app will break without specifying the firestoreDatabaseId
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Fetch dynamic Firebase configuration from LocalStorage if user has connected their own project
+export const getActiveFirebaseConfig = () => {
+  const custom = localStorage.getItem('clarity_flow_custom_firebase_config');
+  if (custom) {
+    try {
+      return JSON.parse(custom);
+    } catch (e) {
+      console.error('Failed to parse custom firebase config:', e);
+    }
+  }
+  return defaultFirebaseConfig;
+};
+
+const firebaseConfig = getActiveFirebaseConfig();
+
+// Initialize or retrieve existing app instance
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+// Connect Firestore (use specific database ID if provided, otherwise default to standard)
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Customize Google Provider setting to prompt accounts
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 export enum OperationType {
   CREATE = 'create',

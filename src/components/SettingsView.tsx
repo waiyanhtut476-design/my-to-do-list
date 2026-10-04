@@ -173,73 +173,6 @@ export const SettingsView: React.FC = () => {
             <span className="text-indigo-600 dark:text-indigo-400 font-bold">เตือนก่อน 30 นาที</span>
           </div>
 
-          <div className="h-px bg-slate-100 dark:bg-slate-800"></div>
-
-          {/* Item: Meeting integrations */}
-          <div className="flex items-center justify-between text-xs pt-1">
-            <span className="font-bold text-slate-700 dark:text-slate-300">แนบลิงก์การประชุม Meet อัตโนมัติ</span>
-            <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
-              <input type="checkbox" defaultChecked className="sr-only peer" />
-              <div className="w-8 h-4.5 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-3.5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600"></div>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Do Not Disturb Focus Schedule */}
-      <div className="space-y-2.5">
-        <div className="flex flex-col px-0.5">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">โหมดโฟกัส & พักผ่อน (Do Not Disturb)</span>
-          <span className="text-[11px] text-slate-400">ปิดเสียงเตือนอัตโนมัติเพื่อให้คุณมีสมาธิและหลับสนิท</span>
-        </div>
-
-        <div className="rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-4">
-          <div className="flex items-start justify-between text-xs">
-            <div className="flex flex-col">
-              <span className="font-bold text-slate-700 dark:text-slate-300">กำหนดช่วงเวลาอัตโนมัติ</span>
-              <span className="text-[10px] text-slate-400 mt-0.5">ปิดเสียงรบกวนตามตารางการนอนและทำงาน</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
-              <input 
-                type="checkbox"
-                checked={settings.dndEnabled}
-                onChange={(e) => handleToggle('dndEnabled', e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-            </label>
-          </div>
-
-          {/* Schedule range preview pill */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/50">
-            <div className="flex items-center gap-2.5">
-              <Moon className="w-5 h-5 text-indigo-500" />
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">22:00 น. — 07:00 น.</span>
-                <span className="text-[10px] text-slate-400">ทุกวัน (จันทร์ - อาทิตย์)</span>
-              </div>
-            </div>
-            <button 
-              type="button"
-              onClick={() => {
-                alert('ฟีเจอร์ปรับแต่งเวลา DND แนะนำให้อิงการจำลอง 22:00 น. - 07:00 น. บนเดโมนี้เพื่อการทำงานแบบเรียลไทม์ที่สอดคล้องกัน!');
-              }}
-              className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-700 font-bold text-[10px] text-indigo-600 dark:text-indigo-400 border border-slate-200/50 shadow-xs"
-            >
-              แก้ไข
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between text-xs pt-1">
-            <div className="flex items-center gap-1 text-red-500 font-bold">
-              <ShieldAlert className="w-4 h-4" />
-              <span>ยกเว้นการแจ้งเตือนสำหรับงานด่วนมาก</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
-              <input type="checkbox" defaultChecked className="sr-only peer" />
-              <div className="w-8 h-4.5 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-3.5 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600"></div>
-            </label>
-          </div>
         </div>
       </div>
 
@@ -261,44 +194,7 @@ export const SettingsView: React.FC = () => {
         </button>
       </div>
 
-      {/* iOS Safari Add to Home Screen Guide Card */}
-      <div className="bg-white dark:bg-slate-850 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-xs space-y-3">
-        <div className="flex items-center gap-3">
-          <img 
-            src="./apple-touch-icon.png" 
-            alt="Clarity Flow Icon" 
-            className="w-12 h-12 rounded-xl object-cover shadow-md border border-slate-100 dark:border-slate-850"
-          />
-          <div className="min-w-0">
-            <span className="font-extrabold text-slate-800 dark:text-white block">ติดตั้งแอปบนหน้าจอโฮม iPhone</span>
-            <span className="text-[10px] text-slate-400">ใช้เสมือนแอปพลิเคชันปกติ (Add to Home Screen)</span>
-          </div>
-        </div>
-        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-2 border border-slate-100 dark:border-slate-700/50">
-          <p className="text-[11px] text-slate-600 dark:text-slate-300 font-semibold leading-relaxed">
-            ขั้นตอนการดาวน์โหลดติดตั้งใน 2 คลิกผ่าน Safari:
-          </p>
-          <ol className="list-decimal pl-4 space-y-1 text-[10px] text-slate-500 dark:text-slate-400">
-            <li>กดปุ่ม <span className="font-bold text-indigo-600 dark:text-indigo-400">แชร์ (Share)</span> ในแถบเครื่องมือด้านล่างของ Safari</li>
-            <li>เลื่อนลงและแตะเลือก <span className="font-bold text-indigo-600 dark:text-indigo-400">"เพิ่มไปยังหน้าจอโฮม" (Add to Home Screen)</span></li>
-          </ol>
-        </div>
-      </div>
 
-      {/* Educational Delight Card */}
-      <div className="rounded-2xl bg-gradient-to-br from-indigo-50/50 via-slate-50 to-indigo-100/20 dark:from-slate-800 dark:to-slate-800/20 p-4 border border-indigo-100/20 dark:border-slate-800">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Lightbulb className="w-4.5 h-4.5" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">เคล็ดลับการทำงานอย่างราบรื่น</span>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-              ผลวิจัยพบว่าการตั้งเตือนล่วงหน้า 30 นาทีสำหรับงานด่วน ช่วยลดโอกาสส่งงานล่าช้าลงได้ถึง 40% และช่วยให้สมองพร้อมสำหรับการสลับบริบทการทำงาน
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Global Toast component inline simulation */}
       {toastMessage && (

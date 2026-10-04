@@ -128,13 +128,7 @@ export const TasksView: React.FC = () => {
               </span>
             </div>
             
-            <button 
-              type="button"
-              onClick={() => alert('ฟีเจอร์จัดเรียงการซิงค์ข้อมูลบนเดโม จัดเรียงตามลำดับความด่วนและวันเวลาสร้างโดยออโต้คลาวด์!')}
-              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
-            >
-              จัดเรียง
-            </button>
+
           </div>
 
           {/* Pending tasks list */}
@@ -327,20 +321,7 @@ export const TasksView: React.FC = () => {
         </div>
       )}
 
-      {/* Motivational Quote banner */}
-      <div className="rounded-xl bg-gradient-to-r from-slate-100 to-indigo-50 dark:from-slate-800 dark:to-slate-800/40 p-4 flex items-center gap-3 border border-slate-100 dark:border-slate-800">
-        <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400">
-          <Sparkles className="w-5 h-5" />
-        </div>
-        <div className="flex flex-col min-w-0">
-          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-            เคล็ดลับเพิ่มสมาธิ: โฟกัสงานด่วนที่สุดก่อนเที่ยง
-          </p>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-            สมองจะมีพลังงานมากที่สุดในช่วง 3 ชั่วโมงแรกของการทำงาน
-          </p>
-        </div>
-      </div>
+
     </div>
 
       {/* Custom DOM Confirmation Modal for Deletion (Safe for sandboxed iframes) */}

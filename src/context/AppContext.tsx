@@ -20,7 +20,7 @@ import {
   orderBy, 
   serverTimestamp
 } from 'firebase/firestore';
-import { auth, db, handleFirestoreError, OperationType } from '../firebase';
+import { auth, db, handleFirestoreError, OperationType, signInWithGoogle as loginGoogle, getActiveFirebaseConfig } from '../firebase';
 import { Task, UserSetting, AppNotification, UserProfile } from '../types';
 
 interface AppContextType {
@@ -35,10 +35,14 @@ interface AppContextType {
   setIsTaskModalOpen: (open: boolean) => void;
   isNotificationOpen: boolean;
   setIsNotificationOpen: (open: boolean) => void;
-  signIn: () => Promise<void>; // Keeps original signature
+  signIn: () => Promise<void>; // Direct Google Sign-In helper
   loginWithEmail: (email: string, pass: string) => Promise<User>;
   registerWithEmail: (email: string, pass: string, name: string) => Promise<User>;
   logout: () => Promise<void>;
+  isUsingCustomConfig: boolean;
+  activeProjectId: string;
+  saveCustomFirebaseConfig: (configText: string) => boolean;
+  clearCustomFirebaseConfig: () => void;
   createTask: (taskData: Omit<Task, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
@@ -62,7 +66,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isTaskModalOpen, setIsTaskModalOpen] = useState<boolean>(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
 
-  // Authenticated State Handler
+  // Configuration Info
+  const [isUsingCustomConfig, setIsUsingCustomConfig] = useState<boolean>(() => {
+    return localStorage.getItem('clarity_flow_custom_firebase_config') !== null;
+  });
+
+  const [activeProjectId, setActiveProjectId] = useState<string>(() => {
+    const config = getActiveFirebaseConfig();
+    return config.projectId || 'optimal-method-9vk22';
+  });
+
+  // Save Config function with regex-tolerant parsing
+  const saveCustomFirebaseConfig = (configText: string): boolean => {
+    try {
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(configText.trim());
+      } catch (jsonErr) {
+        // Fallback to extraction via regex
+        const config: any = {};
+        const keys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'];
+        keys.forEach(key => {
+          const regex = new RegExp(`${key}\\s*:\\s*["']([^"']+)["']`);
+          const match = configText.match(regex);
+          if (match) {
+            config[key] = match[1];
+          }
+        });
+        if (config.apiKey && config.projectId) {
+          parsed = config;
+        }
+      }
+
+      if (parsed && parsed.apiKey && parsed.projectId) {
+        localStorage.setItem('clarity_flow_custom_firebase_config', JSON.stringify(parsed));
+        setIsUsingCustomConfig(true);
+        setActiveProjectId(parsed.projectId);
+        alert('เชื่อมต่อโครงการ Firebase สำเร็จแล้ว! กำลังรีโหลดแอปพลิเคชันเพื่อใช้การตั้งค่าใหม่ของคุณ...');
+        window.location.reload();
+        return true;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
+  };
+
+  const clearCustomFirebaseConfig = () => {
+    localStorage.removeItem('clarity_flow_custom_firebase_config');
+    setIsUsingCustomConfig(false);
+    alert('กลับสู่โครงการเริ่มต้นเรียบร้อย! กำลังรีโหลดแอปพลิเคชัน...');
+    window.location.reload();
+  };
+
+  // Auth Listener
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setAuthLoading(true);
@@ -231,7 +288,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const signIn = async () => {
-    // Keep original signature as no-op or placeholder
+    await loginGoogle();
   };
 
   const logout = async () => {
@@ -255,7 +312,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Create automatic notification if enabled
       if (settings?.notificationsEnabled) {
         let alertMsg = `สร้างงานใหม่สำเร็จ: "${taskData.title}"`;
-        if (taskData.dueDate) alertMsg += ` ครบกำหนด ${taskData.dueDate}`;
+        if (taskData.dueDate) alertMsg += ` ครกกำหนด ${taskData.dueDate}`;
         await createNotification(
           taskData.priority === 'high' ? '⏰ งานด่วนมากใหม่' : '📝 มอบหมายงานใหม่',
           alertMsg,
@@ -391,6 +448,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       loginWithEmail,
       registerWithEmail,
       logout,
+      isUsingCustomConfig,
+      activeProjectId,
+      saveCustomFirebaseConfig,
+      clearCustomFirebaseConfig,
       createTask,
       updateTask,
       deleteTask,
