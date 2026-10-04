@@ -24,7 +24,12 @@ import {
   Mail,
   Lock,
   Key,
-  RefreshCw
+  RefreshCw,
+  Copy,
+  ExternalLink,
+  Globe,
+  AlertCircle,
+  Check
 } from 'lucide-react';
 
 function AppContent() {
@@ -54,12 +59,18 @@ function AppContent() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [authError, setAuthError] = useState<{
+    type: 'unauthorized-domain' | 'operation-not-allowed' | 'general';
+    message: string;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
-  // Dynamic Custom Firebase Setup states
-  const [showConfigInput, setShowConfigInput] = useState(false);
-  const [customConfigText, setCustomConfigText] = useState('');
+  const handleCopyDomain = () => {
+    navigator.clipboard.writeText(window.location.hostname);
+    setCopiedDomain(true);
+    setTimeout(() => setCopiedDomain(false), 3000);
+  };
 
   // Dynamic Thai date formatting
   const getThaiTodayStr = () => {
@@ -73,15 +84,15 @@ function AppContent() {
   const handleEmailAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      setErrorMessage('กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน');
+      setAuthError({ type: 'general', message: 'กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน' });
       return;
     }
     if (password.length < 6) {
-      setErrorMessage('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
+      setAuthError({ type: 'general', message: 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร' });
       return;
     }
 
-    setErrorMessage('');
+    setAuthError(null);
     setIsSubmitting(true);
     try {
       if (authMode === 'login') {
@@ -91,50 +102,70 @@ function AppContent() {
         await registerWithEmail(email, password, finalName);
       }
     } catch (err: any) {
-      console.error(err);
-      let localizedError = 'เกิดข้อผิดพลาดในการยืนยันตัวตน โปรดลองอีกครั้ง';
-      const msg = err?.message || String(err);
-      if (msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('invalid-credential') || msg.includes('auth/invalid-login-credentials') || msg.includes('auth/invalid-credential')) {
-        localizedError = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือระบบไม่พบบัญชีนี้ (หากเข้าใช้งานเป็นครั้งแรก โปรดกดสลับแท็บไปที่ "สมัครสมาชิก" ด้านบนเพื่อเปิดบัญชีก่อนนะครับ)';
+      console.error('Email Auth Error:', err);
+      const msg = err?.code || err?.message || String(err);
+      if (msg.includes('operation-not-allowed')) {
+        setAuthError({
+          type: 'operation-not-allowed',
+          message: 'ยังไม่ได้เปิดสวิตช์ Email/Password ในหน้า Sign-in method ของ Firebase Console'
+        });
+      } else if (msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('invalid-credential') || msg.includes('auth/invalid-login-credentials')) {
+        setAuthError({
+          type: 'general',
+          message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือยังไม่ได้สมัครสมาชิก (หากเข้าใช้งานครั้งแรก โปรดกดสลับไปที่แท็บ "สมัครสมาชิก" ด้านบนเพื่อเปิดบัญชีก่อนนะครับ)'
+        });
       } else if (msg.includes('email-already-in-use')) {
-        localizedError = 'อีเมลนี้ถูกใช้งานแล้ว โปรดเข้าสู่ระบบหรือใช้อีเมลอื่น';
+        setAuthError({
+          type: 'general',
+          message: 'อีเมลนี้ถูกใช้งานแล้ว โปรดสลับไปที่แท็บ "เข้าสู่ระบบ"'
+        });
       } else if (msg.includes('invalid-email')) {
-        localizedError = 'กรุณากรอกรูปแบบอีเมลให้ถูกต้อง';
-      } else if (msg.includes('Configuration not found') || msg.includes('auth/operation-not-allowed')) {
-        localizedError = 'โปรดเปิดใช้การเข้าสู่ระบบแบบ Email/Password ใน Firebase Console ของโครงการคลาวด์ก่อนใช้งานครับ';
+        setAuthError({
+          type: 'general',
+          message: 'กรุณากรอกรูปแบบอีเมลให้ถูกต้อง'
+        });
+      } else {
+        setAuthError({
+          type: 'general',
+          message: err?.message || 'เกิดข้อผิดพลาดในการยืนยันตัวตน โปรดลองอีกครั้ง'
+        });
       }
-      setErrorMessage(localizedError);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
-    setErrorMessage('');
+    setAuthError(null);
     setIsSubmitting(true);
     try {
       await signIn();
     } catch (err: any) {
-      console.error(err);
-      let localizedError = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google';
-      const msg = err?.message || String(err);
-      if (msg.includes('auth/unauthorized-domain')) {
-        localizedError = 'โดเมนนี้ยังไม่ได้รับอนุญาตใน Firebase Console ของคุณ โปรดเปิดเมนู Authorized domains ในหน้า Authentication เพื่อเพิ่มโดเมนเว็บนี้ครับ';
-      } else if (msg.includes('auth/popup-blocked')) {
-        localizedError = 'เบราว์เซอร์บล็อกป๊อปอัป โปรดกดอนุญาตป๊อปอัปเพื่อลงชื่อเข้าใช้งานครับ';
+      console.error('Google Sign-In Error:', err);
+      const msg = err?.code || err?.message || String(err);
+      if (msg.includes('unauthorized-domain')) {
+        setAuthError({
+          type: 'unauthorized-domain',
+          message: 'โดเมนของแอปนี้ยังไม่ได้ถูกเพิ่มใน Authorized domains ของ Firebase Console'
+        });
+      } else if (msg.includes('popup-blocked')) {
+        setAuthError({
+          type: 'general',
+          message: 'เบราว์เซอร์บล็อกหน้าต่างป๊อปอัป โปรดกดอนุญาตป๊อปอัปบนเบราว์เซอร์เพื่อเข้าสู่ระบบ'
+        });
+      } else if (msg.includes('operation-not-allowed')) {
+        setAuthError({
+          type: 'operation-not-allowed',
+          message: 'ยังไม่ได้เปิดใช้งาน Google Sign-In ในหน้า Sign-in method ของ Firebase Console'
+        });
+      } else {
+        setAuthError({
+          type: 'general',
+          message: err?.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google'
+        });
       }
-      setErrorMessage(localizedError);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleSaveConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customConfigText.trim()) return;
-    const success = saveCustomFirebaseConfig(customConfigText);
-    if (!success) {
-      alert('รูปแบบการตั้งค่าไม่ถูกต้อง กรุณาคัดลอกโค้ด JavaScript Object หรือ JSON ของ Firebase Web Config ที่สมบูรณ์จากหน้า Console มาวางตรงๆ ครับ');
     }
   };
 
@@ -163,63 +194,139 @@ function AppContent() {
           </span>
         </div>
 
-        {/* Dynamic Form area */}
+        {/* Form area */}
         <div className="max-w-sm w-full mx-auto bg-white dark:bg-slate-850 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/50 dark:shadow-none space-y-4 my-auto">
-            /* 2. MAIN FIREBASE EMAIL/GOOGLE AUTH VIEW */
-            <div className="space-y-4">
-              <div className="text-center space-y-1">
-                <h1 className="text-lg font-black text-slate-900 dark:text-white">
-                  {authMode === 'login' ? 'เข้าสู่ระบบบัญชีส่วนตัว' : 'สร้างบัญชีเข้าใช้งาน'}
-                </h1>
-                <p className="text-[10px] text-slate-400 leading-normal max-w-[280px] mx-auto">
-                  ข้อมูลจะถูกบันทึกแยกและคุ้มครองอย่างปลอดภัยผ่านฐานข้อมูลคลาวด์ของโครงการคุณเอง
-                </p>
-              </div>
+          <div className="space-y-4">
+            <div className="text-center space-y-1">
+              <h1 className="text-lg font-black text-slate-900 dark:text-white">
+                {authMode === 'login' ? 'เข้าสู่ระบบบัญชีส่วนตัว' : 'สร้างบัญชีเข้าใช้งาน'}
+              </h1>
+              <p className="text-[10px] text-slate-400 leading-normal max-w-[280px] mx-auto">
+                ข้อมูลจะถูกบันทึกแยกและคุ้มครองอย่างปลอดภัยผ่านฐานข้อมูลคลาวด์ของโครงการคุณเอง
+              </p>
+            </div>
 
-              {/* Tab toggler */}
-              <div className="grid grid-cols-2 p-1 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => { setAuthMode('login'); setErrorMessage(''); }}
-                  className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                    authMode === 'login'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-xs'
-                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                  }`}
-                >
-                  เข้าสู่ระบบ
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setAuthMode('register'); setErrorMessage(''); }}
-                  className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                    authMode === 'register'
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-xs'
-                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                  }`}
-                >
-                  สมัครสมาชิก
-                </button>
-              </div>
+            {/* Tab toggler */}
+            <div className="grid grid-cols-2 p-1 bg-slate-50 dark:bg-slate-800 rounded-xl">
+              <button
+                type="button"
+                onClick={() => { setAuthMode('login'); setAuthError(null); }}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  authMode === 'login'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                }`}
+              >
+                เข้าสู่ระบบ
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMode('register'); setAuthError(null); }}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  authMode === 'register'
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                }`}
+              >
+                สมัครสมาชิก
+              </button>
+            </div>
 
-              {errorMessage && (
-                <div className="space-y-2">
-                  <div className="p-3 text-[10px] font-bold text-red-600 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-150 dark:border-red-900/50 leading-relaxed">
-                    ⚠️ {errorMessage}
-                  </div>
-                  
-                  {errorMessage.includes('Firebase Console') && (
-                    <div className="p-3.5 bg-amber-50 dark:bg-amber-950/25 border border-amber-200/60 dark:border-amber-900/40 rounded-xl space-y-1.5 text-[10px] text-amber-800 dark:text-amber-300">
-                      <span className="font-extrabold block text-amber-900 dark:text-amber-200">🛠️ วิธีเปิดใช้ระบบใน 2 คลิก (ง่ายมากครับ):</span>
-                      <ol className="list-decimal pl-4 space-y-1 font-semibold leading-relaxed">
-                        <li>เปิดไปที่: <a href={`https://console.firebase.google.com/project/${activeProjectId}/authentication/providers`} target="_blank" rel="noreferrer" className="underline font-black text-indigo-600 dark:text-indigo-400">หน้าตั้งค่าล็อกอินของโครงการคุณ</a></li>
-                        <li>คลิกเปิดสวิตช์ <span className="font-black text-slate-900 dark:text-white">Email/Password</span> ตัวบนสุดให้เป็นสีฟ้า</li>
-                        <li>กดปุ่ม <span className="font-black text-indigo-600 dark:text-indigo-400">Save (บันทึก)</span> สีน้ำเงิน เป็นอันเสร็จสิ้น!</li>
-                      </ol>
+            {authError && (
+              <div className="space-y-2">
+                {authError.type === 'unauthorized-domain' ? (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl space-y-3 text-xs">
+                    <div className="flex items-start gap-2 text-amber-800 dark:text-amber-300">
+                      <Globe className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <div className="space-y-1">
+                        <span className="font-extrabold block text-sm text-amber-950 dark:text-amber-200">
+                          จำเป็นต้องอนุญาตโดเมนใน Firebase
+                        </span>
+                        <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
+                          เพื่อความปลอดภัย Firebase กำหนดให้ต้องเพิ่มชื่อโดเมนเว็บนี้ในรายการ <b>Authorized domains</b> ก่อน จึงจะล็อกอินด้วย Google ได้ครับ
+                        </p>
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
+
+                    {/* Domain copy box */}
+                    <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-amber-200/80 dark:border-amber-800/60 flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">ชื่อโดเมนเว็บนี้:</span>
+                        <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate block">
+                          {window.location.hostname}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopyDomain}
+                        className="shrink-0 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer"
+                      >
+                        {copiedDomain ? (
+                          <>
+                            <Check className="w-3 h-3 stroke-[3]" />
+                            <span>คัดลอกแล้ว!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>คัดลอกโดเมน</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Steps & Direct Link */}
+                    <div className="space-y-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+                      <span className="font-extrabold text-slate-800 dark:text-white block text-[11px]">วิธีเปิดใช้ใน 3 ขั้นตอน:</span>
+                      <ol className="list-decimal pl-4 space-y-1 leading-relaxed">
+                        <li>กดปุ่ม <b>"คัดลอกโดเมน"</b> ด้านบน</li>
+                        <li>
+                          คลิกเปิดหน้าตั้งค่า: {' '}
+                          <a
+                            href={`https://console.firebase.google.com/project/${activeProjectId}/authentication/settings`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-extrabold text-indigo-600 dark:text-indigo-400 underline inline-flex items-center gap-0.5"
+                          >
+                            <span>Firebase Console &rarr; Authorized domains</span>
+                            <ExternalLink className="w-3 h-3 inline" />
+                          </a>
+                        </li>
+                        <li>เลื่อนลงไปที่ <b>Authorized domains</b> &rarr; กด <b>Add domain</b> &rarr; วางชื่อโดเมน &rarr; กด <b>Save</b></li>
+                      </ol>
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold pt-1">
+                        ✓ เมื่อกด Save แล้ว กลับมากดปุ่ม "เข้าสู่ระบบด้วย Google" ด้านล่างเพื่อเริ่มใช้งานได้ทันทีครับ!
+                      </p>
+                    </div>
+                  </div>
+                ) : authError.type === 'operation-not-allowed' ? (
+                  <div className="p-3.5 bg-amber-50 dark:bg-amber-950/25 border border-amber-200/60 dark:border-amber-900/40 rounded-xl space-y-1.5 text-[11px] text-amber-800 dark:text-amber-300">
+                    <span className="font-extrabold block text-amber-900 dark:text-amber-200">🛠️ วิธีเปิดใช้ระบบล็อกอินใน Firebase:</span>
+                    <ol className="list-decimal pl-4 space-y-1 font-semibold leading-relaxed">
+                      <li>
+                        เปิดไปที่: {' '}
+                        <a
+                          href={`https://console.firebase.google.com/project/${activeProjectId}/authentication/providers`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline font-black text-indigo-600 dark:text-indigo-400 inline-flex items-center gap-0.5"
+                        >
+                          <span>หน้า Sign-in method ของคุณ</span>
+                          <ExternalLink className="w-3 h-3 inline" />
+                        </a>
+                      </li>
+                      <li>คลิกเปิดสวิตช์ <b>Email/Password</b> หรือ <b>Google</b> ให้เป็น Enabled</li>
+                      <li>กดปุ่ม <b>Save (บันทึก)</b> เป็นอันเสร็จสิ้น!</li>
+                    </ol>
+                  </div>
+                ) : (
+                  <div className="p-3 text-[11px] font-bold text-red-600 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-150 dark:border-red-900/50 leading-relaxed flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{authError.message}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
               {/* Auth form */}
               <form onSubmit={handleEmailAuthSubmit} className="space-y-3">
