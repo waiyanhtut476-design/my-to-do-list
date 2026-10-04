@@ -5,7 +5,7 @@ import { Task } from '../types';
 import { MONTH_NAMES, WEEKDAY_HEADERS, formatLocalizedDate, getDaysLeftInfo } from '../i18n/translations';
 
 export const CalendarView: React.FC = () => {
-  const { tasks, updateTask, setIsTaskModalOpen, language, t } = useApp();
+  const { tasks, updateTask, openEditTask, setIsTaskModalOpen, language, t } = useApp();
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>('month');
 
@@ -338,8 +338,12 @@ export const CalendarView: React.FC = () => {
                   {/* Task Card Box */}
                   <div className="flex-1 bg-white dark:bg-slate-850 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-all space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex flex-col min-w-0">
-                        <span className={`font-bold text-sm ${isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white'}`}>
+                      <div 
+                        onClick={() => openEditTask(task)} 
+                        className="flex flex-col min-w-0 cursor-pointer group/item"
+                        title={t('edit')}
+                      >
+                        <span className={`font-bold text-sm transition-colors ${isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-white group-hover/item:text-indigo-600 dark:group-hover/item:text-indigo-400'}`}>
                           {task.title}
                         </span>
                         

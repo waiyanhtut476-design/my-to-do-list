@@ -34,6 +34,10 @@ interface AppContextType {
   authLoading: boolean;
   isTaskModalOpen: boolean;
   setIsTaskModalOpen: (open: boolean) => void;
+  editingTask: Task | null;
+  setEditingTask: (task: Task | null) => void;
+  openEditTask: (task: Task) => void;
+  openCreateTask: () => void;
   isNotificationOpen: boolean;
   setIsNotificationOpen: (open: boolean) => void;
   signIn: () => Promise<void>; // Direct Google Sign-In helper
@@ -71,7 +75,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState<boolean>(false);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState<boolean>(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
+
+  const openEditTask = (task: Task) => {
+    setEditingTask(task);
+    setIsTaskModalOpen(true);
+  };
+
+  const openCreateTask = () => {
+    setEditingTask(null);
+    setIsTaskModalOpen(true);
+  };
 
   // LocalStorage Theme Management
   const [theme, setAppTheme] = useState<'light' | 'dark'>(() => {
@@ -548,6 +563,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       authLoading,
       isTaskModalOpen,
       setIsTaskModalOpen,
+      editingTask,
+      setEditingTask,
+      openEditTask,
+      openCreateTask,
       isNotificationOpen,
       setIsNotificationOpen,
       signIn,

@@ -37,6 +37,7 @@ function AppContent() {
     notifications,
     isTaskModalOpen,
     setIsTaskModalOpen,
+    openCreateTask,
     isNotificationOpen,
     setIsNotificationOpen,
     loginWithEmail,
@@ -556,7 +557,7 @@ function AppContent() {
           <div className="flex items-center justify-center px-2">
             <button
               type="button"
-              onClick={() => setIsTaskModalOpen(true)}
+              onClick={openCreateTask}
               className="w-13 h-13 -mt-6 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-lg shadow-indigo-600/35 hover:shadow-indigo-700/40 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
               title={t('create_task_button')}
             >

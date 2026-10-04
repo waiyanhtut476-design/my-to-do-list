@@ -18,7 +18,8 @@ import {
   Check, 
   ChevronLeft,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Edit3
 } from 'lucide-react';
 
 interface TaskModalProps {
@@ -28,7 +29,7 @@ interface TaskModalProps {
 }
 
 export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDate }) => {
-  const { createTask, language, t } = useApp();
+  const { createTask, updateTask, editingTask, setEditingTask, language, t } = useApp();
   const [mode, setMode] = useState<'task' | 'meeting'>('task');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -51,6 +52,44 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
   const validD = isNaN(initialD.getTime()) ? new Date() : initialD;
   const [pickerYear, setPickerYear] = useState<number>(validD.getFullYear());
   const [pickerMonth, setPickerMonth] = useState<number>(validD.getMonth()); // 0-indexed
+
+  // Populate form fields if editing existing task or creating new task
+  useEffect(() => {
+    if (isOpen) {
+      if (editingTask) {
+        setTitle(editingTask.title || '');
+        setDescription(editingTask.description || '');
+        setCategory(editingTask.categoryId || 'work');
+        setDueDate(editingTask.dueDate || new Date().toISOString().split('T')[0]);
+        setDueTime(editingTask.dueTime || '09:30');
+        setAllDay(!editingTask.dueTime);
+        setPriority(editingTask.priority || 'normal');
+        setSubtasks(editingTask.subtasks ? JSON.parse(JSON.stringify(editingTask.subtasks)) : []);
+        
+        if (editingTask.dueDate) {
+          const parts = editingTask.dueDate.split('-');
+          if (parts[0]) setPickerYear(parseInt(parts[0], 10));
+          if (parts[1]) setPickerMonth(parseInt(parts[1], 10) - 1);
+        }
+      } else {
+        setTitle('');
+        setDescription('');
+        setCategory('work');
+        const fallbackDate = initialDate || new Date().toISOString().split('T')[0];
+        setDueDate(fallbackDate);
+        setDueTime('09:30');
+        setAllDay(false);
+        setPriority('normal');
+        setSubtasks([]);
+        
+        const d = initialDate ? new Date(initialDate) : new Date();
+        if (!isNaN(d.getTime())) {
+          setPickerYear(d.getFullYear());
+          setPickerMonth(d.getMonth());
+        }
+      }
+    }
+  }, [isOpen, editingTask, initialDate]);
 
   // Close calendar popover on outside click
   useEffect(() => {
@@ -145,27 +184,45 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
     setSubtasks(updated);
   };
 
+  const handleClose = () => {
+    setEditingTask(null);
+    onClose();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    await createTask({
-      title: title.trim(),
-      description: description.trim(),
-      status: 'pending',
-      priority,
-      categoryId: category,
-      dueDate: dueDate,
-      dueTime: allDay ? '' : dueTime,
-      subtasks
-    });
+    if (editingTask) {
+      await updateTask(editingTask.id, {
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        categoryId: category,
+        dueDate: dueDate,
+        dueTime: allDay ? '' : dueTime,
+        subtasks
+      });
+    } else {
+      await createTask({
+        title: title.trim(),
+        description: description.trim(),
+        status: 'pending',
+        priority,
+        categoryId: category,
+        dueDate: dueDate,
+        dueTime: allDay ? '' : dueTime,
+        subtasks
+      });
+    }
 
-    // Reset fields
+    // Reset fields & close
     setTitle('');
     setDescription('');
     setCategory('work');
     setPriority('normal');
     setSubtasks([]);
+    setEditingTask(null);
     onClose();
   };
 
@@ -188,12 +245,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/50 backdrop-blur-[2px]">
       {/* Backdrop Close */}
-      <div className="absolute inset-0" onClick={onClose}></div>
+      <div className="absolute inset-0" onClick={handleClose}></div>
 
       {/* Sheet Container */}
       <div className="relative z-20 w-full max-w-lg bg-white dark:bg-slate-900 rounded-t-[32px] border-t border-slate-100 dark:border-slate-800 flex flex-col max-h-[90dvh] overflow-hidden animate-slide-up shadow-2xl">
         {/* Drag handle */}
-        <div className="pt-3 pb-1 flex justify-center cursor-pointer" onClick={onClose}>
+        <div className="pt-3 pb-1 flex justify-center cursor-pointer" onClick={handleClose}>
           <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full"></div>
         </div>
 
@@ -201,37 +258,44 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
         <header className="px-5 py-2.5 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
           <button 
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
 
-          {/* Mode switch */}
-          <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setMode('task')}
-              className={`px-4 py-1.5 rounded-full transition-all cursor-pointer ${
-                mode === 'task' 
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-              }`}
-            >
-              {t('modal_mode_task')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('meeting')}
-              className={`px-4 py-1.5 rounded-full transition-all cursor-pointer ${
-                mode === 'meeting' 
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
-              }`}
-            >
-              {t('modal_mode_meeting')}
-            </button>
-          </div>
+          {/* Mode switch or Edit Header */}
+          {editingTask ? (
+            <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-extrabold text-sm">
+              <Edit3 className="w-4 h-4" />
+              <span>{t('edit_task_title')}</span>
+            </div>
+          ) : (
+            <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setMode('task')}
+                className={`px-4 py-1.5 rounded-full transition-all cursor-pointer ${
+                  mode === 'task' 
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                }`}
+              >
+                {t('modal_mode_task')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('meeting')}
+                className={`px-4 py-1.5 rounded-full transition-all cursor-pointer ${
+                  mode === 'meeting' 
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
+                }`}
+              >
+                {t('modal_mode_meeting')}
+              </button>
+            </div>
+          )}
 
           <button 
             type="button"
@@ -239,7 +303,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
             disabled={!title.trim()}
             className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 disabled:opacity-50 cursor-pointer"
           >
-            {t('save')}
+            {editingTask ? t('save_changes') : t('save')}
           </button>
         </header>
 
@@ -360,7 +424,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
               <button
                 type="button"
                 onClick={() => handleQuickDate(7)}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors cursor-pointer shrink-0"
+                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-755 transition-colors cursor-pointer shrink-0"
               >
                 {t('nextweek_chip')}
               </button>
@@ -385,7 +449,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
 
                 {/* Interactive Calendar Popover */}
                 {isDatePickerOpen && (
-                  <div className="absolute left-0 top-full mt-2 z-50 w-72 p-3 bg-white dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute left-0 top-full mt-2 z-50 w-72 p-3 bg-white dark:bg-slate-855 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl animate-in fade-in zoom-in-95 duration-100">
                     {/* Calendar Month Header */}
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-bold text-slate-800 dark:text-white">
@@ -463,7 +527,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
                             if (p[1]) setPickerMonth(parseInt(p[1], 10) - 1);
                           }
                         }}
-                        className="text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-0.5 text-slate-700 dark:text-slate-200 outline-none"
+                        className="text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-lg px-2 py-0.5 text-slate-700 dark:text-slate-200 outline-none"
                       />
                     </div>
                   </div>
@@ -657,8 +721,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
             disabled={!title.trim()}
             className="w-full py-3.5 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 disabled:shadow-none text-white text-sm font-bold shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/35 transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer disabled:cursor-not-allowed"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>{t('create_task_button')}</span>
+            {editingTask ? (
+              <>
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>{t('save_changes')}</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>{t('create_task_button')}</span>
+              </>
+            )}
           </button>
           {!title.trim() && (
             <p className="text-[11px] text-center text-slate-400 dark:text-slate-500 font-medium">
