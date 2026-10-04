@@ -1,0 +1,8 @@
+{
+  "name": "Clarity Flow",
+  "description": "แอปพลิเคชันจัดการรายการงานพร้อมระบบแจ้งเตือนและสถิติกราฟรายสัปดาห์ สะดวกและปลอดภัย",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

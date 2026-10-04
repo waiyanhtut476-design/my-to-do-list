@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Global Security Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. Users Collection Rules
+    function isValidUser(data) {
+      return data.userId == request.auth.uid 
+        && data.email is string && data.email.size() <= 254
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100))
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && userId == request.auth.uid;
+      allow create: if isVerifiedUser() && userId == request.auth.uid && isValidUser(incoming()) && incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && userId == request.auth.uid && isValidUser(incoming()) 
+        && incoming().createdAt == existing().createdAt
+        && incoming().userId == existing().userId;
+      allow delete: if false;
+    }
+
+    // 2. Tasks Collection Rules
+    function isValidTask(data) {
+      return data.ownerId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
+        && data.status in ['pending', 'completed']
+        && data.priority in ['high', 'medium', 'normal']
+        && data.categoryId is string && data.categoryId.size() <= 50
+        && (!('dueDate' in data) || (data.dueDate is string && data.dueDate.size() <= 10))
+        && (!('dueTime' in data) || (data.dueTime is string && data.dueTime.size() <= 5))
+        && (!('subtasks' in data) || (data.subtasks is list && data.subtasks.size() <= 10))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /tasks/{taskId} {
+      allow list, get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(taskId) && isValidTask(incoming()) 
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(taskId) && resource.data.ownerId == request.auth.uid && isValidTask(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().ownerId == existing().ownerId
+        && incoming().updatedAt == request.time;
+      allow delete: if isVerifiedUser() && isValidId(taskId) && resource.data.ownerId == request.auth.uid;
+    }
+
+    // 3. UserSettings Collection Rules
+    function isValidSetting(data) {
+      return data.ownerId == request.auth.uid
+        && data.darkMode is bool
+        && data.notificationsEnabled is bool
+        && (!('dndEnabled' in data) || data.dndEnabled is bool)
+        && (!('dndStartTime' in data) || (data.dndStartTime is string && data.dndStartTime.size() <= 5))
+        && (!('dndEndTime' in data) || (data.dndEndTime is string && data.dndEndTime.size() <= 5))
+        && (!('earlyReminderMinutes' in data) || data.earlyReminderMinutes is int)
+        && (!('urgentReminderRepeat' in data) || data.urgentReminderRepeat is bool)
+        && data.updatedAt is timestamp;
+    }
+
+    match /user_settings/{settingId} {
+      allow read: if isSignedIn() && settingId == request.auth.uid;
+      allow create: if isVerifiedUser() && settingId == request.auth.uid && isValidSetting(incoming())
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && settingId == request.auth.uid && resource.data.ownerId == request.auth.uid && isValidSetting(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // 4. Notifications Collection Rules
+    function isValidNotification(data) {
+      return data.ownerId == request.auth.uid
+        && data.title is string && data.title.size() <= 150
+        && data.body is string && data.body.size() <= 500
+        && data.type in ['reminder', 'system', 'assignment']
+        && data.read is bool
+        && data.createdAt is timestamp;
+    }
+
+    match /notifications/{notificationId} {
+      allow list, get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(notificationId) && isValidNotification(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(notificationId) && resource.data.ownerId == request.auth.uid && isValidNotification(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().ownerId == existing().ownerId;
+      allow delete: if isVerifiedUser() && isValidId(notificationId) && resource.data.ownerId == request.auth.uid;
+    }
+  }
+}
