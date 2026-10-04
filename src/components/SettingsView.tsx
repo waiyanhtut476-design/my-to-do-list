@@ -243,18 +243,21 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Cloud Sync & Device information */}
-      <div className="bg-white dark:bg-slate-850 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-xs space-y-1">
-        <span className="font-extrabold text-slate-700 dark:text-slate-300 block">คลาวด์ซิงค์และบัญชีผู้ใช้</span>
+      {/* Local Storage details */}
+      <div className="bg-white dark:bg-slate-850 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-xs space-y-1.5">
+        <span className="font-extrabold text-slate-700 dark:text-slate-300 block">การจัดเก็บข้อมูลในเครื่อง (Local Storage)</span>
         <p className="text-slate-500 dark:text-slate-400">
-          ลงชื่อเข้าใช้งานด้วยอีเมล: <span className="font-bold text-slate-800 dark:text-slate-200">{user?.email}</span>
+          สถานะ: <span className="text-emerald-500 font-bold">● บันทึกปลอดภัยภายในเครื่อง 100%</span>
+        </p>
+        <p className="text-[10px] text-slate-400 leading-relaxed">
+          ข้อมูลรายการงาน ตารางปฏิทิน และการแจ้งเตือนทั้งหมดของคุณจะถูกบันทึกและซิงค์ไว้บนอุปกรณ์นี้โดยตรงอย่างรวดเร็ว ปราศจากขั้นตอนการเข้าสู่ระบบและเชื่อมต่ออินเทอร์เน็ตที่ซับซ้อน
         </p>
         <button
           type="button"
           onClick={logout}
-          className="text-red-500 hover:text-red-600 font-bold pt-2 cursor-pointer"
+          className="text-red-500 hover:text-red-600 font-bold pt-1 cursor-pointer text-left block"
         >
-          ออกจากระบบบัญชี Google
+          รีเซ็ตและล้างข้อมูลแอปทั้งหมดบนเครื่องนี้
         </button>
       </div>
 

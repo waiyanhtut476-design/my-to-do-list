@@ -1,27 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  User, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  collection, 
-  onSnapshot, 
-  query, 
-  where, 
-  orderBy, 
-  serverTimestamp,
-  getDocFromServer
-} from 'firebase/firestore';
-import { auth, db, handleFirestoreError, OperationType } from '../firebase';
-import { Task, UserSetting, AppNotification, UserProfile, Subtask } from '../types';
+import { Task, UserSetting, AppNotification, UserProfile } from '../types';
 
 interface AppContextType {
-  user: User | null;
+  user: { uid: string; displayName: string; email: string; photoURL: string } | null;
   userProfile: UserProfile | null;
   tasks: Task[];
   settings: UserSetting | null;
@@ -47,173 +28,153 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  // Static Local User to fully bypass auth
+  const [user] = useState({
+    uid: 'local_user',
+    displayName: 'กานต์',
+    email: 'local@clarityflow.app',
+    photoURL: ''
+  });
+
+  const [userProfile] = useState<UserProfile | null>({
+    userId: 'local_user',
+    email: 'local@clarityflow.app',
+    displayName: 'กานต์',
+    photoURL: '',
+    createdAt: new Date()
+  });
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [settings, setSettings] = useState<UserSetting | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [authLoading] = useState<boolean>(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState<boolean>(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
 
-  // Validate connection on boot as required by Firestore integration guide
+  // Load from LocalStorage on mount
   useEffect(() => {
-    async function testConnection() {
+    // 1. Settings
+    const storedSettings = localStorage.getItem('clarity_flow_settings');
+    if (storedSettings) {
       try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration. Client is offline.");
-        }
+        setSettings(JSON.parse(storedSettings));
+      } catch (e) {
+        console.error(e);
       }
+    } else {
+      const defaultSettings: UserSetting = {
+        ownerId: 'local_user',
+        darkMode: false,
+        notificationsEnabled: true,
+        dndEnabled: false,
+        dndStartTime: '22:00',
+        dndEndTime: '07:00',
+        earlyReminderMinutes: 30,
+        urgentReminderRepeat: true,
+        updatedAt: new Date()
+      };
+      localStorage.setItem('clarity_flow_settings', JSON.stringify(defaultSettings));
+      setSettings(defaultSettings);
     }
-    testConnection();
-  }, []);
 
-  useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      setAuthLoading(true);
-      if (currentUser) {
-        setUser(currentUser);
-        
-        // Ensure User Profile document exists
-        const userRef = doc(db, 'users', currentUser.uid);
-        try {
-          const userSnap = await getDoc(userRef);
-          if (!userSnap.exists()) {
-            const profilePayload = {
-              userId: currentUser.uid,
-              email: currentUser.email || '',
-              displayName: currentUser.displayName || 'ผู้ใช้งาน Clarity Flow',
-              photoURL: currentUser.photoURL || '',
-              createdAt: serverTimestamp()
-            };
-            await setDoc(userRef, profilePayload);
-            setUserProfile({
-              ...profilePayload,
-              createdAt: new Date()
-            });
-          } else {
-            setUserProfile(userSnap.data() as UserProfile);
-          }
-        } catch (err) {
-          console.error('Error creating user profile document:', err);
-        }
-
-        // Ensure User Settings document exists
-        const settingsRef = doc(db, 'user_settings', currentUser.uid);
-        try {
-          const settingsSnap = await getDoc(settingsRef);
-          if (!settingsSnap.exists()) {
-            const defaultSettings: UserSetting = {
-              ownerId: currentUser.uid,
-              darkMode: false,
-              notificationsEnabled: true,
-              dndEnabled: false,
-              dndStartTime: '22:00',
-              dndEndTime: '07:00',
-              earlyReminderMinutes: 30,
-              urgentReminderRepeat: true,
-              updatedAt: serverTimestamp()
-            };
-            await setDoc(settingsRef, defaultSettings);
-            setSettings({
-              ...defaultSettings,
-              updatedAt: new Date()
-            });
-          } else {
-            setSettings(settingsSnap.data() as UserSetting);
-          }
-        } catch (err) {
-          console.error('Error creating user settings document:', err);
-        }
-      } else {
-        setUser(null);
-        setUserProfile(null);
-        setTasks([]);
-        setSettings(null);
-        setNotifications([]);
-        setLoading(false);
+    // 2. Tasks
+    const storedTasks = localStorage.getItem('clarity_flow_tasks');
+    if (storedTasks) {
+      try {
+        const parsed = JSON.parse(storedTasks).map((t: any) => ({
+          ...t,
+          createdAt: new Date(t.createdAt),
+          updatedAt: new Date(t.updatedAt)
+        }));
+        setTasks(parsed);
+      } catch (e) {
+        console.error(e);
       }
-      setAuthLoading(false);
-    });
+    } else {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-    return () => unsubscribeAuth();
-  }, []);
+      const initialTasks: Task[] = [
+        {
+          id: 'task_1',
+          ownerId: 'local_user',
+          title: 'จัดระเบียบเป้าหมายประจำวัน 🎯',
+          description: 'ลิสต์งานสำคัญและคัดแยกตามลำดับความเร่งด่วน',
+          priority: 'high',
+          status: 'pending',
+          dueDate: todayStr,
+          dueTime: '10:00',
+          categoryId: 'work',
+          subtasks: [],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          id: 'task_2',
+          ownerId: 'local_user',
+          title: 'ทบทวนแผนการทำงานสัปดาห์นี้ 📈',
+          description: 'เช็คความคืบหน้าระบบและประสานงานร่วมกับทีม',
+          priority: 'medium',
+          status: 'pending',
+          dueDate: tomorrowStr,
+          dueTime: '14:00',
+          categoryId: 'work',
+          subtasks: [],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          id: 'task_3',
+          ownerId: 'local_user',
+          title: 'ตั้งค่าแอปพลิเคชัน Clarity Flow 🔔',
+          description: 'สลับโหมดถนอมสายตาและเปิดระบบแจ้งเตือนด่วนพิเศษ',
+          priority: 'normal',
+          status: 'completed',
+          dueDate: todayStr,
+          dueTime: '09:00',
+          categoryId: 'personal',
+          subtasks: [],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ];
+      localStorage.setItem('clarity_flow_tasks', JSON.stringify(initialTasks));
+      setTasks(initialTasks);
+    }
 
-  // Sync real-time documents once user is authenticated
-  useEffect(() => {
-    if (!user) return;
-
-    setLoading(true);
-
-    // 1. Subscribe to Tasks
-    const tasksQuery = query(
-      collection(db, 'tasks'),
-      where('ownerId', '==', user.uid),
-      orderBy('createdAt', 'desc')
-    );
-
-    const unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
-      const fetchedTasks: Task[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        fetchedTasks.push({
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
-        } as Task);
-      });
-      setTasks(fetchedTasks);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `tasks [ownerId=${user.uid}]`);
-    });
-
-    // 2. Subscribe to Notifications
-    const notificationsQuery = query(
-      collection(db, 'notifications'),
-      where('ownerId', '==', user.uid),
-      orderBy('createdAt', 'desc')
-    );
-
-    const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
-      const fetchedNotifications: AppNotification[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        fetchedNotifications.push({
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : data.createdAt,
-        } as AppNotification);
-      });
-      setNotifications(fetchedNotifications);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `notifications [ownerId=${user.uid}]`);
-    });
-
-    // 3. Subscribe to Settings Changes
-    const settingsRef = doc(db, 'user_settings', user.uid);
-    const unsubscribeSettings = onSnapshot(settingsRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setSettings({
-          ...data,
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
-        } as UserSetting);
+    // 3. Notifications
+    const storedNotifs = localStorage.getItem('clarity_flow_notifications');
+    if (storedNotifs) {
+      try {
+        const parsed = JSON.parse(storedNotifs).map((n: any) => ({
+          ...n,
+          createdAt: new Date(n.createdAt)
+        }));
+        setNotifications(parsed);
+      } catch (e) {
+        console.error(e);
       }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `user_settings/${user.uid}`);
-    });
+    } else {
+      const initialNotifs: AppNotification[] = [
+        {
+          id: 'notif_welcome',
+          ownerId: 'local_user',
+          title: 'ยินดีต้อนรับสู่ Clarity Flow! 🎉',
+          body: 'แอปจัดระเบียบงานด่วนพิเศษของคุณพร้อมใช้งานแล้ว ข้อมูลจะถูกบันทึกบนเครื่องของคุณโดยตรงอย่างปลอดภัย',
+          type: 'assignment',
+          read: false,
+          createdAt: new Date()
+        }
+      ];
+      localStorage.setItem('clarity_flow_notifications', JSON.stringify(initialNotifs));
+      setNotifications(initialNotifs);
+    }
 
-    return () => {
-      unsubscribeTasks();
-      unsubscribeNotifications();
-      unsubscribeSettings();
-    };
-  }, [user]);
+    setLoading(false);
+  }, []);
 
   // Sync Dark Mode state to root HTML element
   useEffect(() => {
@@ -226,162 +187,119 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [settings]);
 
-  // Auth Operations
-  const signIn = async () => {
-    try {
-      const { signInWithGoogle } = await import('../firebase');
-      await signInWithGoogle();
-    } catch (error: any) {
-      console.error('Sign-in Error:', error);
-      alert(`เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google: ${error?.message || error}\n\nคำแนะนำ:\n1. โปรดอนุญาตป๊อปอัป (Popup) บนเบราว์เซอร์ของคุณ\n2. เปิดการใช้งานคุกกี้บุคคลที่สาม (Third-party Cookies) สำหรับหน้าต่างนี้ เพื่อซิงค์ข้อมูลคลาวด์ได้อย่างปลอดภัยครับ`);
-    }
-  };
-
+  // Auth Operations (No-ops/Local helper)
+  const signIn = async () => {};
   const logout = async () => {
-    const { logoutUser } = await import('../firebase');
-    await logoutUser();
+    if (confirm('คุณต้องการรีเซ็ตแอปพลิเคชันและล้างข้อมูลทั้งหมดในเครื่องนี้ใช่หรือไม่?')) {
+      localStorage.clear();
+      window.location.reload();
+    }
   };
 
   // Task Operations
   const createTask = async (taskData: Omit<Task, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>) => {
-    if (!user) throw new Error("User not authenticated");
     const taskId = 'task_' + Math.random().toString(36).substring(2, 15);
-    const path = `tasks/${taskId}`;
-    try {
-      const taskPayload = {
-        ...taskData,
-        ownerId: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-      await setDoc(doc(db, 'tasks', taskId), taskPayload);
+    const newTask: Task = {
+      ...taskData,
+      id: taskId,
+      ownerId: 'local_user',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-      // Create automatic notification if enabled
-      if (settings?.notificationsEnabled) {
-        let alertMsg = `สร้างงานใหม่สำเร็จ: "${taskData.title}"`;
-        if (taskData.dueDate) alertMsg += ` ครบกำหนด ${taskData.dueDate}`;
-        await createNotification(
-          taskData.priority === 'high' ? '⏰ งานด่วนมากใหม่' : '📝 มอบหมายงานใหม่',
-          alertMsg,
-          'assignment'
-        );
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
+    const updatedTasks = [newTask, ...tasks];
+    setTasks(updatedTasks);
+    localStorage.setItem('clarity_flow_tasks', JSON.stringify(updatedTasks));
+
+    // Create automatic notification if enabled
+    if (settings?.notificationsEnabled) {
+      let alertMsg = `สร้างงานใหม่สำเร็จ: "${taskData.title}"`;
+      if (taskData.dueDate) alertMsg += ` ครบกำหนด ${taskData.dueDate}`;
+      await createNotification(
+        taskData.priority === 'high' ? '⏰ งานด่วนมากใหม่' : '📝 มอบหมายงานใหม่',
+        alertMsg,
+        'assignment'
+      );
     }
   };
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
-    if (!user) throw new Error("User not authenticated");
-    const path = `tasks/${taskId}`;
-    try {
-      // Remove immutable or generated fields from updates
-      const safeUpdates = { ...updates };
-      delete safeUpdates.id;
-      delete safeUpdates.ownerId;
-      delete safeUpdates.createdAt;
-      
-      const payload = {
-        ...safeUpdates,
-        updatedAt: serverTimestamp()
-      };
-
-      await updateDoc(doc(db, 'tasks', taskId), payload);
-
-      // Trigger standard completion notification if status toggled to completed
-      if (updates.status === 'completed' && settings?.notificationsEnabled) {
-        // Fetch task name
-        const taskName = tasks.find(t => t.id === taskId)?.title || 'งานของคุณ';
-        await createNotification(
-          '🎯 ยินดีด้วย! คุณทำงานสำเร็จ',
-          `คุณเคลียร์งาน "${taskName}" เสร็จสิ้นเรียบร้อยแล้ว`,
-          'reminder'
-        );
+    const updatedTasks = tasks.map(t => {
+      if (t.id === taskId) {
+        const { id, ...safeUpdates } = updates;
+        return { ...t, ...safeUpdates, id: taskId, updatedAt: new Date() } as Task;
       }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
+      return t;
+    });
+
+    setTasks(updatedTasks);
+    localStorage.setItem('clarity_flow_tasks', JSON.stringify(updatedTasks));
+
+    // Trigger standard completion notification if status toggled to completed
+    if (updates.status === 'completed' && settings?.notificationsEnabled) {
+      const taskName = tasks.find(t => t.id === taskId)?.title || 'งานของคุณ';
+      await createNotification(
+        '🎯 ยินดีด้วย! คุณทำงานสำเร็จ',
+        `คุณเคลียร์งาน "${taskName}" เสร็จสิ้นเรียบร้อยแล้ว`,
+        'reminder'
+      );
     }
   };
 
   const deleteTask = async (taskId: string) => {
-    if (!user) throw new Error("User not authenticated");
-    const path = `tasks/${taskId}`;
-    try {
-      await deleteDoc(doc(db, 'tasks', taskId));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, path);
-    }
+    const updatedTasks = tasks.filter(t => t.id !== taskId);
+    setTasks(updatedTasks);
+    localStorage.setItem('clarity_flow_tasks', JSON.stringify(updatedTasks));
   };
 
   // User Settings Operations
   const updateSettings = async (updates: Partial<UserSetting>) => {
-    if (!user) throw new Error("User not authenticated");
-    const path = `user_settings/${user.uid}`;
-    try {
-      const safeUpdates = { ...updates };
-      delete safeUpdates.ownerId;
-
-      await updateDoc(doc(db, 'user_settings', user.uid), {
-        ...safeUpdates,
-        updatedAt: serverTimestamp()
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
-    }
+    if (!settings) return;
+    const updatedSettings = {
+      ...settings,
+      ...updates,
+      updatedAt: new Date()
+    };
+    setSettings(updatedSettings);
+    localStorage.setItem('clarity_flow_settings', JSON.stringify(updatedSettings));
   };
 
   // In-App Notification Operations
   const createNotification = async (title: string, body: string, type: AppNotification['type']) => {
-    if (!user) return;
     const notificationId = 'notif_' + Math.random().toString(36).substring(2, 15);
-    const path = `notifications/${notificationId}`;
-    try {
-      await setDoc(doc(db, 'notifications', notificationId), {
-        title,
-        body,
-        type,
-        read: false,
-        ownerId: user.uid,
-        createdAt: serverTimestamp()
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
-    }
+    const newNotif: AppNotification = {
+      id: notificationId,
+      ownerId: 'local_user',
+      title,
+      body,
+      type,
+      read: false,
+      createdAt: new Date()
+    };
+
+    const updatedNotifs = [newNotif, ...notifications];
+    setNotifications(updatedNotifs);
+    localStorage.setItem('clarity_flow_notifications', JSON.stringify(updatedNotifs));
   };
 
   const markNotificationAsRead = async (notificationId: string) => {
-    if (!user) return;
-    const path = `notifications/${notificationId}`;
-    try {
-      await updateDoc(doc(db, 'notifications', notificationId), {
-        read: true
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, path);
-    }
+    const updatedNotifs = notifications.map(n => 
+      n.id === notificationId ? { ...n, read: true } : n
+    );
+    setNotifications(updatedNotifs);
+    localStorage.setItem('clarity_flow_notifications', JSON.stringify(updatedNotifs));
   };
 
   const markAllNotificationsAsRead = async () => {
-    if (!user) return;
-    try {
-      const unread = notifications.filter(n => !n.read);
-      const promises = unread.map(async (n) => {
-        await updateDoc(doc(db, 'notifications', n.id), { read: true });
-      });
-      await Promise.all(promises);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'notifications/multiple');
-    }
+    const updatedNotifs = notifications.map(n => ({ ...n, read: true }));
+    setNotifications(updatedNotifs);
+    localStorage.setItem('clarity_flow_notifications', JSON.stringify(updatedNotifs));
   };
 
   const clearNotification = async (notificationId: string) => {
-    if (!user) return;
-    const path = `notifications/${notificationId}`;
-    try {
-      await deleteDoc(doc(db, 'notifications', notificationId));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, path);
-    }
+    const updatedNotifs = notifications.filter(n => n.id !== notificationId);
+    setNotifications(updatedNotifs);
+    localStorage.setItem('clarity_flow_notifications', JSON.stringify(updatedNotifs));
   };
 
   return (
