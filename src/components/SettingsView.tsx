@@ -243,21 +243,21 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Local Storage details */}
+      {/* Cloud Sync & Account details */}
       <div className="bg-white dark:bg-slate-850 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-xs space-y-1.5">
-        <span className="font-extrabold text-slate-700 dark:text-slate-300 block">การจัดเก็บข้อมูลในเครื่อง (Local Storage)</span>
+        <span className="font-extrabold text-slate-700 dark:text-slate-300 block">บัญชีผู้ใช้และระบบคลาวด์ซิงค์</span>
         <p className="text-slate-500 dark:text-slate-400">
-          สถานะ: <span className="text-emerald-500 font-bold">● บันทึกปลอดภัยภายในเครื่อง 100%</span>
+          บัญชีปัจจุบัน: <span className="font-bold text-slate-800 dark:text-slate-200">{user?.email}</span>
         </p>
         <p className="text-[10px] text-slate-400 leading-relaxed">
-          ข้อมูลรายการงาน ตารางปฏิทิน และการแจ้งเตือนทั้งหมดของคุณจะถูกบันทึกและซิงค์ไว้บนอุปกรณ์นี้โดยตรงอย่างรวดเร็ว ปราศจากขั้นตอนการเข้าสู่ระบบและเชื่อมต่ออินเทอร์เน็ตที่ซับซ้อน
+          ข้อมูลรายการงาน การตั้งค่า และตารางกิจกรรมของคุณจะถูกซิงค์ข้อมูลแยกเป็นส่วนตัวบนคลาวด์แบบเรียลไทม์ ปลอดภัยและเรียกดูได้จากทุกอุปกรณ์
         </p>
         <button
           type="button"
           onClick={logout}
           className="text-red-500 hover:text-red-600 font-bold pt-1 cursor-pointer text-left block"
         >
-          รีเซ็ตและล้างข้อมูลแอปทั้งหมดบนเครื่องนี้
+          ออกจากระบบบัญชีส่วนตัว
         </button>
       </div>
 

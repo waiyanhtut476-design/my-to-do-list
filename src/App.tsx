@@ -20,24 +20,35 @@ import {
   ShieldCheck, 
   Eye, 
   Award,
-  LogOut
+  LogOut,
+  Mail,
+  Lock
 } from 'lucide-react';
 
 function AppContent() {
   const { 
     user, 
     userProfile, 
-    signIn, 
     authLoading, 
     loading, 
     notifications,
     isTaskModalOpen,
     setIsTaskModalOpen,
     isNotificationOpen,
-    setIsNotificationOpen
+    setIsNotificationOpen,
+    loginWithEmail,
+    registerWithEmail
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'tasks' | 'calendar' | 'analytics' | 'settings'>('tasks');
+
+  // Email form states
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Dynamic Thai date formatting
   const getThaiTodayStr = () => {
@@ -47,6 +58,48 @@ function AppContent() {
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleEmailAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setErrorMessage('กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน');
+      return;
+    }
+    if (authMode === 'register' && !displayName) {
+      setErrorMessage('กรุณากรอกชื่อที่ต้องการให้แสดงผล');
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMessage('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+
+    setErrorMessage('');
+    setIsSubmitting(true);
+    try {
+      if (authMode === 'login') {
+        await loginWithEmail(email, password);
+      } else {
+        await registerWithEmail(email, password, displayName);
+      }
+    } catch (err: any) {
+      console.error(err);
+      let localizedError = 'เกิดข้อผิดพลาดในการยืนยันตัวตน โปรดลองอีกครั้ง';
+      const msg = err?.message || String(err);
+      if (msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('invalid-credential') || msg.includes('auth/invalid-login-credentials')) {
+        localizedError = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง โปรดตรวจสอบอีกครั้ง';
+      } else if (msg.includes('email-already-in-use')) {
+        localizedError = 'อีเมลนี้ถูกใช้งานแล้ว โปรดเข้าสู่ระบบหรือใช้อีเมลอื่น';
+      } else if (msg.includes('invalid-email')) {
+        localizedError = 'กรุณากรอกรูปแบบอีเมลให้ถูกต้อง';
+      } else if (msg.includes('Configuration not found') || msg.includes('auth/operation-not-allowed')) {
+        localizedError = 'โปรดเปิดใช้การเข้าสู่ระบบแบบ Email/Password ใน Firebase Console ของคุณก่อนใช้งานครับ';
+      }
+      setErrorMessage(localizedError);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Render Loader during Auth checking
   if (authLoading) {
@@ -62,7 +115,7 @@ function AppContent() {
   // Render Login Landing Page when logged out
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white flex flex-col justify-between py-12 px-6">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white flex flex-col justify-between py-8 px-6">
         {/* Top brand */}
         <div className="flex items-center gap-2 justify-center">
           <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/35">
@@ -73,69 +126,134 @@ function AppContent() {
           </span>
         </div>
 
-        {/* Hero Illustration details */}
-        <div className="max-w-sm mx-auto text-center space-y-6 my-auto">
-          <div className="relative inline-block">
-            <div className="w-24 h-24 rounded-3xl bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto shadow-sm">
-              <Award className="w-12 h-12 stroke-[1.5]" />
-            </div>
-            <span className="absolute -top-1 -right-1 flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">
-              จัดระเบียบความคิด <br />พิชิตเป้าหมายทุกวัน
+        {/* Beautiful Authentication Card */}
+        <div className="max-w-sm w-full mx-auto bg-white dark:bg-slate-850 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-100/50 dark:shadow-none space-y-5 my-auto">
+          <div className="text-center space-y-1">
+            <h1 className="text-xl font-black text-slate-900 dark:text-white">
+              {authMode === 'login' ? 'เข้าสู่ระบบบัญชีส่วนตัว' : 'สร้างบัญชีเข้าใช้งาน'}
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-[280px] mx-auto">
-              แอปพลิเคชันจดบันทึกงานที่รองรับระบบแจ้งเตือนอัจฉริยะ ล็อกอินรวดเร็ว ซิงค์เรียลไทม์ และรายงานสถิติกราฟความคืบหน้า
+            <p className="text-[11px] text-slate-400 leading-normal max-w-[280px] mx-auto">
+              ใช้งานได้ทุกคน ข้อมูลของคุณจะบันทึกแยกเป็นส่วนตัวบนระบบคลาวด์อย่างปลอดภัยด้วย Gmail ของคุณเอง
             </p>
           </div>
 
-          {/* Social Sign-In */}
-          <button
-            type="button"
-            onClick={signIn}
-            className="w-full py-4 px-6 rounded-2xl bg-white dark:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 hover:bg-slate-50 font-bold text-sm shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-3 cursor-pointer"
-          >
-            {/* Minimalist Google Icon concept */}
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.18 1-.78 1.85-1.63 2.42v2.84h2.64c1.55-2.43 2.63-6 2.63-9.52z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-2.64-2.84c-.73.49-1.66.78-2.64.78-2.03 0-3.75-1.37-4.36-3.22H1.94v2.96C3.76 21.04 7.57 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M7.64 15.06c-.15-.49-.24-.98-.24-1.5s.09-1.01.24-1.5V9.1H1.94C1.3 10.42 1 11.92 1 13.5s.3 3.08.94 4.4l3.14-2.44-1.12-2.4c0-.74-.08-1.52-.08-2.3z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.57 1 3.76 2.96 1.94 5.88l3.14 2.44c.61-1.85 2.33-3.22 4.36-3.22z"
-              />
-            </svg>
-            <span>เข้าสู่ระบบรวดเร็วด้วย Google</span>
-          </button>
+          {/* Tab toggler */}
+          <div className="grid grid-cols-2 p-1 bg-slate-50 dark:bg-slate-800 rounded-xl">
+            <button
+              type="button"
+              onClick={() => { setAuthMode('login'); setErrorMessage(''); }}
+              className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                authMode === 'login'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+              }`}
+            >
+              เข้าสู่ระบบ
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAuthMode('register'); setErrorMessage(''); }}
+              className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                authMode === 'register'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+              }`}
+            >
+              สมัครสมาชิก
+            </button>
+          </div>
+
+          {errorMessage && (
+            <div className="p-3 text-[11px] font-semibold text-red-500 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50">
+              {errorMessage}
+            </div>
+          )}
+
+          {/* Auth form */}
+          <form onSubmit={handleEmailAuthSubmit} className="space-y-4">
+            {authMode === 'register' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                  ชื่อที่ต้องการให้แสดงผล
+                </label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="เช่น สมชาย ใจดี"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-950 transition-all text-slate-800 dark:text-white"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                อีเมล / Gmail
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@gmail.com"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-950 transition-all text-slate-800 dark:text-white"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                รหัสผ่านสำหรับเข้าใช้แอป
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="ความยาวอย่างน้อย 6 ตัวอักษร"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-750 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-950 transition-all text-slate-800 dark:text-white"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-indigo-600/35 hover:shadow-indigo-700/40 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>กำลังดำเนินการ...</span>
+                </>
+              ) : (
+                <span>{authMode === 'login' ? 'เข้าสู่ระบบเลย 🚀' : 'สมัครสมาชิกแล้วเริ่มลุย 🎉'}</span>
+              )}
+            </button>
+          </form>
         </div>
 
         {/* Value Propositions */}
         <div className="grid grid-cols-3 gap-2 max-w-sm mx-auto text-center text-[10px] font-bold text-slate-400">
           <div className="space-y-1">
-            <Cloud className="w-5 h-5 mx-auto text-slate-400" />
-            <span>ซิงค์เรียลไทม์</span>
+            <Cloud className="w-5 h-5 mx-auto text-indigo-500/80" />
+            <span>ซิงค์แยกบัญชีส่วนตัว</span>
           </div>
           <div className="space-y-1">
-            <Eye className="w-5 h-5 mx-auto text-slate-400" />
+            <Eye className="w-5 h-5 mx-auto text-indigo-500/80" />
             <span>โหมดถนอมสายตา</span>
           </div>
           <div className="space-y-1">
-            <ShieldCheck className="w-5 h-5 mx-auto text-slate-400" />
-            <span>คลาวด์ปลอดภัย</span>
+            <ShieldCheck className="w-5 h-5 mx-auto text-indigo-500/80" />
+            <span>คลาวด์ปลอดภัย 100%</span>
           </div>
         </div>
       </div>
