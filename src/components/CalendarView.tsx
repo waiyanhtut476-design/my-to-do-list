@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Calendar, ChevronLeft, ChevronRight, Check, Video, FileText, Plus, Bell, RefreshCw, Users, BookOpen } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Check, Video, RefreshCw, Plus } from 'lucide-react';
 import { Task } from '../types';
+import { MONTH_NAMES, WEEKDAY_HEADERS, formatLocalizedDate, getDaysLeftInfo } from '../i18n/translations';
 
 export const CalendarView: React.FC = () => {
-  const { tasks, updateTask, setIsTaskModalOpen } = useApp();
+  const { tasks, updateTask, setIsTaskModalOpen, language, t } = useApp();
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>('month');
 
-  // Month navigation calculations
-  const [currentYear, setCurrentYear] = useState(2024);
-  const [currentMonth, setCurrentMonth] = useState(4); // 0-indexed (May = 4)
-  const thaiMonths = [
-    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-  ];
+  const now = new Date();
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(now.getMonth());
+
+  const currentMonthsList = MONTH_NAMES[language] || MONTH_NAMES['th'];
+  const weekdayHeaders = WEEKDAY_HEADERS[language] || WEEKDAY_HEADERS['th'];
 
   const handlePrevMonth = () => {
     if (currentMonth === 0) {
@@ -43,7 +43,6 @@ export const CalendarView: React.FC = () => {
 
   // Helper to format due date comparisons
   const getTasksForDate = (dateStr: string) => {
-    // Supposes date formats in database are YYYY-MM-DD
     return tasks.filter(t => t.dueDate === dateStr);
   };
 
@@ -55,11 +54,8 @@ export const CalendarView: React.FC = () => {
 
   // Generate real calendar days based on currentYear and currentMonth state
   const getCalendarCells = () => {
-    // Determine the weekday of the 1st of the month (0 = Sun, 1 = Mon, etc.)
     const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
-    // Determine total days in current month
     const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
-    // Determine total days in previous month
     const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate();
 
     const cells = [];
@@ -125,6 +121,26 @@ export const CalendarView: React.FC = () => {
     await updateTask(task.id, { status: nextStatus });
   };
 
+  const displayedYear = language === 'th' ? currentYear + 543 : currentYear;
+
+  const getCategoryName = (catId?: string) => {
+    switch (catId) {
+      case 'work': return t('cat_work');
+      case 'project': return t('cat_project');
+      case 'personal': return t('cat_personal');
+      case 'learning': return t('cat_learning');
+      default: return t('cat_work');
+    }
+  };
+
+  const getPriorityLabel = (priority?: string) => {
+    switch (priority) {
+      case 'high': return t('priority_high_label');
+      case 'medium': return t('priority_medium_label');
+      default: return t('priority_normal_label');
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Month Selector Widget */}
@@ -132,20 +148,22 @@ export const CalendarView: React.FC = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">
-              {thaiMonths[currentMonth]} {currentYear + 543 /* Thai Buddhist Calendar conversion */}
+              {currentMonthsList[currentMonth]} {displayedYear}
             </h2>
             <div className="flex items-center">
               <button 
                 type="button"
                 onClick={handlePrevMonth}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 cursor-pointer"
+                title="Previous Month"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button 
                 type="button"
                 onClick={handleNextMonth}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 cursor-pointer"
+                title="Next Month"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -155,10 +173,10 @@ export const CalendarView: React.FC = () => {
           <button 
             type="button"
             onClick={handleToday}
-            className="px-3.5 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold text-xs active:scale-95 transition-all flex items-center gap-1 shadow-xs border border-indigo-100/50"
+            className="px-3.5 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold text-xs active:scale-95 transition-all flex items-center gap-1 shadow-xs border border-indigo-100/50 cursor-pointer"
           >
             <Calendar className="w-3.5 h-3.5" />
-            <span>วันนี้</span>
+            <span>{t('calendar_today')}</span>
           </button>
         </div>
 
@@ -169,13 +187,13 @@ export const CalendarView: React.FC = () => {
               key={mode}
               type="button"
               onClick={() => setViewMode(mode)}
-              className={`flex-1 py-1.5 rounded-lg font-semibold text-xs text-center transition-all ${
+              className={`flex-1 py-1.5 rounded-lg font-semibold text-xs text-center transition-all cursor-pointer ${
                 viewMode === mode 
                   ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' 
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
-              {mode === 'month' ? 'เดือน' : mode === 'week' ? 'สัปดาห์' : 'กำหนดการ'}
+              {mode === 'month' ? t('view_month') : mode === 'week' ? t('view_week') : t('view_agenda')}
             </button>
           ))}
         </div>
@@ -185,13 +203,11 @@ export const CalendarView: React.FC = () => {
       <section className="bg-white dark:bg-slate-850 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col gap-2.5">
         {/* Day Header names */}
         <div className="grid grid-cols-7 text-center font-bold text-xs text-slate-400 dark:text-slate-500">
-          <span className="text-red-500">อา.</span>
-          <span>จ.</span>
-          <span>อ.</span>
-          <span>พ.</span>
-          <span>พฤ.</span>
-          <span className="text-indigo-600 dark:text-indigo-400">ศ.</span>
-          <span>ส.</span>
+          {weekdayHeaders.map((head, i) => (
+            <span key={i} className={i === 0 ? 'text-red-500' : i === 5 ? 'text-indigo-600 dark:text-indigo-400' : ''}>
+              {head}
+            </span>
+          ))}
         </div>
 
         {/* Calendar cells grid */}
@@ -203,7 +219,7 @@ export const CalendarView: React.FC = () => {
                 key={cell.date}
                 type="button"
                 onClick={() => setSelectedDate(cell.date)}
-                className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all relative ${
+                className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all relative cursor-pointer ${
                   isSelected
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/35 scale-105 font-bold z-10'
                     : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
@@ -225,15 +241,15 @@ export const CalendarView: React.FC = () => {
         <div className="flex items-center justify-center gap-4 pt-2.5 mt-1 bg-slate-50 dark:bg-slate-800/50 rounded-xl py-1.5 px-3 border border-slate-100/50 dark:border-slate-800">
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
             <span className="w-2 h-2 rounded-full bg-red-500"></span>
-            <span>ด่วนมาก</span>
+            <span>{t('calendar_legend_urgent')}</span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
             <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-            <span>งานทั่วไป</span>
+            <span>{t('calendar_legend_normal')}</span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>เสร็จสิ้น</span>
+            <span>{t('calendar_legend_completed')}</span>
           </div>
         </div>
       </section>
@@ -245,12 +261,12 @@ export const CalendarView: React.FC = () => {
             <RefreshCw className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
           </div>
           <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
-            เชื่อมต่อ Google Calendar เรียบร้อยแล้ว
+            {t('gcal_connected')}
           </span>
         </div>
         <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          อัปเดตแล้ว
+          {t('gcal_updated')}
         </span>
       </section>
 
@@ -259,11 +275,13 @@ export const CalendarView: React.FC = () => {
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
             <span className="font-bold text-sm text-slate-900 dark:text-white">
-              {selectedDate === '2024-05-24' ? 'วันศุกร์ที่ 24 พฤษภาคม' : `วันที่ ${selectedDate}`}
+              {formatLocalizedDate(selectedDate, language)}
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
           </div>
-          <span className="text-[11px] text-slate-400 font-semibold">มี {selectedDayTasks.length} งานที่ต้องจัดการวันนี้</span>
+          <span className="text-[11px] text-slate-400 font-semibold">
+            {selectedDayTasks.length} {t('daily_tasks_count')}
+          </span>
         </div>
         {selectedDayTasks.length > 0 && (
           <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-2.5 py-1 rounded-full shadow-xs border border-slate-100 dark:border-slate-700">
@@ -282,8 +300,8 @@ export const CalendarView: React.FC = () => {
 
         {selectedDayTasks.length === 0 ? (
           <div className="py-12 text-center text-xs text-slate-400 font-semibold space-y-1">
-            <p>😴 ไม่มีนัดหมายหรือกำหนดส่งในวันนี้</p>
-            <p className="text-[11px] text-slate-400">พักผ่อนให้เต็มที่ หรือกดจัดตารางเพื่อเริ่ม!</p>
+            <p>{t('no_schedule_today')}</p>
+            <p className="text-[11px] text-slate-400">{t('no_schedule_sub')}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -296,13 +314,15 @@ export const CalendarView: React.FC = () => {
                 <div key={task.id} className="flex items-start gap-3 py-1.5 relative z-10">
                   {/* Time label */}
                   <div className="w-12 shrink-0 text-right pt-2">
-                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{task.dueTime || 'ตลอดวัน'}</span>
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                      {task.dueTime ? `${task.dueTime} ${t('time_unit')}`.trim() : t('all_day_label')}
+                    </span>
                   </div>
 
                   {/* Node Icon */}
                   <button 
                     onClick={() => handleToggleTaskStatus(task)}
-                    className={`relative z-10 mt-2.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                    className={`relative z-10 mt-2.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all cursor-pointer ${
                       isCompleted 
                         ? 'bg-emerald-500 text-white shadow-xs' 
                         : isHigh 
@@ -325,28 +345,39 @@ export const CalendarView: React.FC = () => {
                         
                         <div className="flex items-center gap-1.5 flex-wrap mt-1">
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">
-                            {task.categoryId === 'work' ? 'งานบริษัท' : task.categoryId === 'project' ? 'งานโปรเจกต์' : task.categoryId === 'personal' ? 'ส่วนตัว' : 'การเรียนรู้'}
+                            {getCategoryName(task.categoryId)}
                           </span>
                           {task.dueTime && (
                             <span className="text-[10px] text-slate-400 font-semibold">
-                              {task.dueTime} น.
+                              {task.dueTime} {t('time_unit')}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {/* Urgency Badge */}
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
-                        isCompleted 
-                          ? 'bg-slate-100 text-slate-500' 
-                          : isHigh 
-                            ? 'bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400' 
-                            : isMedium 
-                              ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400'
-                              : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400'
-                      }`}>
-                        {isCompleted ? 'เสร็จแล้ว' : isHigh ? 'ด่วนมาก' : isMedium ? 'ปานกลาง' : 'ปกติ'}
-                      </span>
+                      {/* Urgency and Days Left Badge */}
+                      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                        {(() => {
+                          const daysInfo = getDaysLeftInfo(task.dueDate, task.dueTime, language);
+                          if (!daysInfo) return null;
+                          return (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold shadow-2xs ${daysInfo.badgeClass}`}>
+                              {daysInfo.badgeText}
+                            </span>
+                          );
+                        })()}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
+                          isCompleted 
+                            ? 'bg-slate-100 text-slate-500' 
+                            : isHigh 
+                              ? 'bg-red-100 text-red-600 dark:bg-red-950/30 dark:text-red-400' 
+                              : isMedium 
+                                ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400'
+                                : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400'
+                        }`}>
+                          {isCompleted ? t('completed_tasks') : getPriorityLabel(task.priority)}
+                        </span>
+                      </div>
                     </div>
 
                     {task.description && (
@@ -359,8 +390,8 @@ export const CalendarView: React.FC = () => {
                     {task.subtasks && task.subtasks.length > 0 && (
                       <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1 flex justify-between">
-                          <span>รายการย่อย</span>
-                          <span>{task.subtasks.filter(s => s.completed).length}/{task.subtasks.length} เสร็จแล้ว</span>
+                          <span>{t('subtasks_title')}</span>
+                          <span>{task.subtasks.filter(s => s.completed).length}/{task.subtasks.length} {t('subtasks_done_suffix')}</span>
                         </div>
                         <div className="space-y-1">
                           {task.subtasks.map((sub, sIdx) => (
@@ -372,31 +403,6 @@ export const CalendarView: React.FC = () => {
                             </div>
                           ))}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Collaborative Meet layout triggers */}
-                    {task.title.includes('ประชุม') && (
-                      <div className="space-y-2 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 mt-1">
-                        <div className="flex items-center gap-2">
-                          <div className="flex -space-x-1.5 overflow-hidden">
-                            <div className="w-5.5 h-5.5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold ring-2 ring-white">ก</div>
-                            <div className="w-5.5 h-5.5 rounded-full bg-teal-500 text-white flex items-center justify-center text-[9px] font-bold ring-2 ring-white">ธ</div>
-                          </div>
-                          <span className="text-[10px] text-slate-400 font-semibold">+3 คนในทีม</span>
-                        </div>
-                        <a 
-                          href="https://meet.google.com" 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="flex items-center justify-between px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold rounded-lg hover:bg-indigo-100 transition-all cursor-pointer"
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <Video className="w-3.5 h-3.5" />
-                            <span className="truncate">Google Meet: design-sync-q3</span>
-                          </div>
-                          <Plus className="w-3 h-3" />
-                        </a>
                       </div>
                     )}
                   </div>
@@ -414,16 +420,20 @@ export const CalendarView: React.FC = () => {
             <Plus className="w-5 h-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-xs text-slate-900 dark:text-white leading-tight">เพิ่มนัดหมายใหม่</span>
-            <span className="text-[10px] text-slate-400 font-semibold">จัดตารางทันทีบนคลาวด์</span>
+            <span className="font-bold text-xs text-slate-900 dark:text-white leading-tight">
+              {language === 'my' ? 'အလုပ်သစ် ထည့်သွင်းပါ' : language === 'en' ? 'Add New Task' : 'สร้างงานและนัดหมายใหม่'}
+            </span>
+            <span className="text-[10px] text-slate-400 font-semibold">
+              {language === 'my' ? 'Cloud ပေါ်တွင် သိမ်းဆည်းမည်' : language === 'en' ? 'Synced to your cloud' : 'จัดตารางทันทีบนคลาวด์'}
+            </span>
           </div>
         </div>
         <button 
           type="button"
           onClick={() => setIsTaskModalOpen(true)}
-          className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow-sm transition-transform active:scale-95"
+          className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow-sm transition-transform active:scale-95 cursor-pointer"
         >
-          จัดตาราง
+          {t('create_task_button')}
         </button>
       </section>
     </div>

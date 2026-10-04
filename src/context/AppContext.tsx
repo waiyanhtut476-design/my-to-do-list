@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType, signInWithGoogle as loginGoogle, getActiveFirebaseConfig } from '../firebase';
 import { Task, UserSetting, AppNotification, UserProfile } from '../types';
+import { Language, translations, TranslationKey } from '../i18n/translations';
 
 interface AppContextType {
   user: User | null;
@@ -54,6 +55,9 @@ interface AppContextType {
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => Promise<void>;
   toggleTheme: () => Promise<void>;
+  language: Language;
+  setLanguage: (lang: Language) => Promise<void>;
+  t: (key: TranslationKey) => string;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -79,6 +83,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     } catch (e) {
       return 'light';
+    }
+  });
+
+  // Multi-Language Management (Thai, English, Myanmar)
+  const [language, setAppLanguage] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('clarity_flow_lang');
+      if (saved === 'th' || saved === 'en' || saved === 'my') {
+        return saved as Language;
+      }
+      return 'th';
+    } catch {
+      return 'th';
     }
   });
 
@@ -264,6 +281,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubscribeSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        if (data.language && (data.language === 'th' || data.language === 'en' || data.language === 'my')) {
+          setAppLanguage(data.language);
+          try {
+            localStorage.setItem('clarity_flow_lang', data.language);
+          } catch {}
+        }
         setSettings({
           ...data,
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : data.updatedAt,
@@ -279,6 +302,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubscribeSettings();
     };
   }, [user]);
+
+  const setLanguage = async (newLang: Language) => {
+    setAppLanguage(newLang);
+    try {
+      localStorage.setItem('clarity_flow_lang', newLang);
+    } catch (e) {
+      console.error('Failed to save language in localStorage', e);
+    }
+
+    if (user) {
+      try {
+        await updateSettings({ language: newLang });
+      } catch (err) {
+        console.error('Failed to sync language to Firestore:', err);
+      }
+    }
+  };
+
+  const t = (key: TranslationKey): string => {
+    const langDict = translations[language] || translations['th'];
+    return langDict[key] || translations['en'][key] || key;
+  };
 
   const setTheme = async (newTheme: 'light' | 'dark') => {
     setAppTheme(newTheme);
@@ -523,7 +568,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clearNotification,
       theme,
       setTheme,
-      toggleTheme
+      toggleTheme,
+      language,
+      setLanguage,
+      t
     }}>
       {children}
     </AppContext.Provider>

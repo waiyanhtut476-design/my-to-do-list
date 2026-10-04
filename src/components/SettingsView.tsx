@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Bell, Cloud, Trash2, ShieldAlert, Moon, Sun, Sparkles, Check, HelpCircle } from 'lucide-react';
+import { Bell, Cloud, Trash2, ShieldAlert, Moon, Sun, Sparkles, Check, HelpCircle, Globe } from 'lucide-react';
+import { SettingsLanguageCards } from './LanguageSelector';
 
 export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, logout, user, theme, setTheme } = useApp();
+  const { settings, updateSettings, logout, user, theme, setTheme, t } = useApp();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   if (!settings) return null;
@@ -17,12 +18,12 @@ export const SettingsView: React.FC = () => {
 
   const handleToggle = async (key: keyof typeof settings, val: any) => {
     await updateSettings({ [key]: val });
-    showToast('บันทึกการเปลี่ยนแปลงแล้ว');
+    showToast(t('toast_saved'));
   };
 
   const handleThemeChange = async (newTheme: 'light' | 'dark') => {
     await setTheme(newTheme);
-    showToast(newTheme === 'dark' ? 'สลับเป็นโหมดมืดเรียบร้อยแล้ว' : 'สลับเป็นโหมดสว่างเรียบร้อยแล้ว');
+    showToast(newTheme === 'dark' ? t('toast_dark_theme') : t('toast_light_theme'));
   };
 
   const handleReset = async () => {
@@ -33,7 +34,7 @@ export const SettingsView: React.FC = () => {
       earlyReminderMinutes: 30,
       urgentReminderRepeat: true
     });
-    showToast('รีเซ็ตเป็นค่าเริ่มต้นเรียบร้อย');
+    showToast(t('toast_reset'));
   };
 
   return (
@@ -41,23 +42,45 @@ export const SettingsView: React.FC = () => {
       {/* Settings Sub-header */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col min-w-0">
-          <h1 className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">ตั้งค่าแอปพลิเคชัน</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">จัดการการซิงค์ รูปลักษณ์ และการแจ้งเตือน</p>
+          <h1 className="text-lg font-extrabold text-slate-900 dark:text-white leading-tight">
+            {t('settings_main_title')}
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+            {t('settings_main_desc')}
+          </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-100/50">
             <Cloud className="w-3.5 h-3.5" />
-            <span>บันทึกแล้ว</span>
+            <span>{t('cloud_saved_badge')}</span>
           </span>
           <button 
             type="button"
             onClick={handleReset}
-            className="text-xs font-bold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+            className="text-xs font-bold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
           >
-            รีเซ็ต
+            {t('reset_defaults')}
           </button>
         </div>
+      </div>
+
+      {/* Language Selection Card (Thai, English, Myanmar) */}
+      <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-3.5">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+            <Globe className="w-5.5 h-5.5" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-extrabold text-slate-900 dark:text-white">
+              {t('lang_section_title')}
+            </span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+              {t('lang_section_desc')}
+            </span>
+          </div>
+        </div>
+        <SettingsLanguageCards />
       </div>
 
       {/* Master Switch Card */}
@@ -68,9 +91,11 @@ export const SettingsView: React.FC = () => {
               <Bell className="w-5.5 h-5.5" />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-extrabold text-slate-900 dark:text-white">อนุญาตการแจ้งเตือนทั้งหมด</span>
+              <span className="text-sm font-extrabold text-slate-900 dark:text-white">
+                {t('notify_master_title')}
+              </span>
               <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-                รับการแจ้งเตือนสำคัญเกี่ยวกับงาน นัดหมาย และสรุปภารกิจประจำวัน
+                {t('notify_master_desc')}
               </span>
             </div>
           </div>
@@ -97,15 +122,17 @@ export const SettingsView: React.FC = () => {
               {theme === 'dark' ? <Moon className="w-5.5 h-5.5" /> : <Sun className="w-5.5 h-5.5" />}
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-extrabold text-slate-900 dark:text-white">โหมดการแสดงผล (Theme)</span>
+              <span className="text-sm font-extrabold text-slate-900 dark:text-white">
+                {t('theme_section_title')}
+              </span>
               <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-                ปรับโทนสีหน้าจอให้เหมาะสมกับสภาพแวดล้อม เพื่อความสบายตาในการใช้งาน
+                {t('theme_section_desc')}
               </span>
             </div>
           </div>
 
           {/* Quick iOS toggle */}
-          <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none mt-1" title="สลับโหมดมืด/สว่าง">
+          <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none mt-1" title="Toggle Theme">
             <input 
               type="checkbox"
               checked={theme === 'dark'}
@@ -131,12 +158,12 @@ export const SettingsView: React.FC = () => {
               <Sun className="w-4 h-4" />
             </div>
             <div className="text-center">
-              <span className="text-xs font-bold block">โหมดสว่าง (Light)</span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">สบายตาในที่แจ้ง</span>
+              <span className="text-xs font-bold block">{t('theme_light')}</span>
+              <span className="text-[10px] text-slate-400 block mt-0.5">{t('theme_light_desc')}</span>
             </div>
             {theme === 'light' && (
               <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 pt-0.5">
-                <Check className="w-3 h-3 stroke-[3]" /> กำลังใช้งาน
+                <Check className="w-3 h-3 stroke-[3]" /> Active
               </span>
             )}
           </button>
@@ -154,28 +181,23 @@ export const SettingsView: React.FC = () => {
               <Moon className="w-4 h-4" />
             </div>
             <div className="text-center">
-              <span className="text-xs font-bold block">โหมดมืด (Dark)</span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">ถนอมสายตาตอนกลางคืน</span>
+              <span className="text-xs font-bold block">{t('theme_dark')}</span>
+              <span className="text-[10px] text-slate-400 block mt-0.5">{t('theme_dark_desc')}</span>
             </div>
             {theme === 'dark' && (
               <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 flex items-center gap-0.5 pt-0.5">
-                <Check className="w-3 h-3 stroke-[3]" /> กำลังใช้งาน
+                <Check className="w-3 h-3 stroke-[3]" /> Active
               </span>
             )}
           </button>
-        </div>
-
-        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 pt-0.5">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-          <span>ระบบจดจำธีมที่คุณเลือกไว้โดยอัตโนมัติในทุกครั้งที่เปิดใช้งาน</span>
         </div>
       </div>
 
       {/* Advance Reminders Settings */}
       <div className="space-y-2.5">
         <div className="flex flex-col px-0.5">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">เวลาเตือนล่วงหน้าเริ่มต้น</span>
-          <span className="text-[11px] text-slate-400">กำหนดเวลาเตือนก่อนถึงกำหนดส่งงานหรือเริ่มนัดหมาย</span>
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('reminder_title')}</span>
+          <span className="text-[11px] text-slate-400">{t('reminder_desc')}</span>
         </div>
 
         <div className="rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-4">
@@ -183,16 +205,16 @@ export const SettingsView: React.FC = () => {
           {/* Urgent tasks reminders advance */}
           <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-800/40 rounded-xl p-3 border border-slate-100/50 dark:border-slate-800">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">งานด่วน / ความสำคัญสูง</span>
-              <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-[9px] font-bold">สำคัญมาก</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{t('urgent_tasks_heading')}</span>
+              <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-[9px] font-bold">Important</span>
             </div>
 
             <div className="flex flex-wrap gap-1.5 pt-1">
               {[
-                { label: '15 นาที', mins: 15 },
-                { label: '30 นาที', mins: 30 },
-                { label: '1 ชม.', mins: 60 },
-                { label: '1 วัน', mins: 1440 }
+                { label: '15m', mins: 15 },
+                { label: '30m', mins: 30 },
+                { label: '1h', mins: 60 },
+                { label: '1d', mins: 1440 }
               ].map((chip) => {
                 const isActive = settings.earlyReminderMinutes === chip.mins;
                 return (
@@ -200,7 +222,7 @@ export const SettingsView: React.FC = () => {
                     key={chip.mins}
                     type="button"
                     onClick={() => handleToggle('earlyReminderMinutes', chip.mins)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer ${
                       isActive
                         ? 'bg-indigo-600 text-white shadow-xs font-bold scale-[1.02]'
                         : 'bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
@@ -214,7 +236,7 @@ export const SettingsView: React.FC = () => {
 
             {/* Repeat toggle */}
             <div className="flex items-center justify-between pt-2 border-t border-slate-200/40 dark:border-slate-700/60 mt-1">
-              <span className="text-[11px] font-semibold text-slate-500">เตือนซ้ำก่อนครบกำหนด 10 นาที</span>
+              <span className="text-[11px] font-semibold text-slate-500">{t('repeat_reminder')}</span>
               <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
                 <input 
                   type="checkbox"
@@ -229,8 +251,8 @@ export const SettingsView: React.FC = () => {
 
           {/* Item: General tasks default */}
           <div className="flex items-center justify-between text-xs pt-1">
-            <span className="font-bold text-slate-700 dark:text-slate-300">งานทั่วไป (General Tasks)</span>
-            <span className="text-indigo-600 dark:text-indigo-400 font-bold">เตือนก่อน 30 นาที</span>
+            <span className="font-bold text-slate-700 dark:text-slate-300">{t('general_tasks_heading')}</span>
+            <span className="text-indigo-600 dark:text-indigo-400 font-bold">{t('general_tasks_value')}</span>
           </div>
 
         </div>
@@ -238,19 +260,19 @@ export const SettingsView: React.FC = () => {
 
       {/* Cloud Sync & Account details */}
       <div className="bg-white dark:bg-slate-850 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-xs space-y-1.5">
-        <span className="font-extrabold text-slate-700 dark:text-slate-300 block">บัญชีผู้ใช้และระบบคลาวด์ซิงค์</span>
+        <span className="font-extrabold text-slate-700 dark:text-slate-300 block">{t('account_section_title')}</span>
         <p className="text-slate-500 dark:text-slate-400">
-          บัญชีปัจจุบัน: <span className="font-bold text-slate-800 dark:text-slate-200">{user?.email}</span>
+          {t('current_account_label')} <span className="font-bold text-slate-800 dark:text-slate-200">{user?.email}</span>
         </p>
         <p className="text-[10px] text-slate-400 leading-relaxed">
-          ข้อมูลรายการงาน การตั้งค่า และตารางกิจกรรมของคุณจะถูกซิงค์ข้อมูลแยกเป็นส่วนตัวบนคลาวด์แบบเรียลไทม์ ปลอดภัยและเรียกดูได้จากทุกอุปกรณ์
+          {t('account_sync_desc')}
         </p>
         <button
           type="button"
           onClick={logout}
           className="text-red-500 hover:text-red-600 font-bold pt-1 cursor-pointer text-left block"
         >
-          ออกจากระบบบัญชีส่วนตัว
+          {t('logout_button')}
         </button>
       </div>
 

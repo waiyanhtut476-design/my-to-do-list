@@ -27,6 +27,7 @@ export interface UserSetting {
   dndEndTime: string; // HH:MM
   earlyReminderMinutes: number; // 15 | 30 | 60 | 1440
   urgentReminderRepeat: boolean;
+  language?: 'th' | 'en' | 'my';
   updatedAt: any;
 }
 
