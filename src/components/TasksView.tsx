@@ -15,7 +15,10 @@ import {
   Edit3, 
   Share2, 
   Sparkles,
-  CalendarPlus
+  CalendarPlus,
+  Pin,
+  Repeat,
+  Tag
 } from 'lucide-react';
 import { getDaysLeftInfo } from '../i18n/translations';
 import confetti from 'canvas-confetti';
@@ -78,23 +81,25 @@ export const TasksView: React.FC = () => {
 
   // Filter & Search
   let filteredPending = pendingTasks.filter(t => {
-    // Category / priority filter
     if (filter === 'high' && t.priority !== 'high') return false;
     if (filter === 'project' && t.categoryId !== 'project') return false;
     if (filter === 'personal' && t.categoryId !== 'personal') return false;
 
-    // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchTitle = t.title.toLowerCase().includes(q);
       const matchDesc = t.description?.toLowerCase().includes(q);
-      return matchTitle || matchDesc;
+      const matchTags = t.tags?.some(tag => tag.toLowerCase().includes(q));
+      return matchTitle || matchDesc || matchTags;
     }
     return true;
   });
 
-  // Sort logic
+  // Sort logic (Pinned tasks always float to top first)
   filteredPending = [...filteredPending].sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+
     if (sortBy === 'dueSoonest') {
       if (!a.dueDate) return 1;
       if (!b.dueDate) return -1;
@@ -118,6 +123,10 @@ export const TasksView: React.FC = () => {
   const handleToggleStatus = async (task: Task) => {
     const nextStatus = task.status === 'completed' ? 'pending' : 'completed';
     await updateTask(task.id, { status: nextStatus });
+  };
+
+  const handleTogglePin = async (task: Task) => {
+    await updateTask(task.id, { isPinned: !task.isPinned });
   };
 
   const handleDelete = (id: string) => {
@@ -150,9 +159,10 @@ export const TasksView: React.FC = () => {
     if (pendingTasks.length > 0) {
       summary += `🟡 ${t('pending_tasks')} (${pendingTasks.length}):\n`;
       pendingTasks.forEach((t, i) => {
-        const priorityTag = t.priority === 'high' ? '🔥' : t.priority === 'medium' ? '⚡' : '📌';
+        const pinTag = t.isPinned ? '📌 ' : '';
+        const priorityTag = t.priority === 'high' ? '🔥' : t.priority === 'medium' ? '⚡' : '📝';
         const timeTag = t.dueTime ? ` [${t.dueTime}]` : '';
-        summary += `${i + 1}. ${priorityTag} ${t.title}${timeTag}\n`;
+        summary += `${i + 1}. ${pinTag}${priorityTag} ${t.title}${timeTag}\n`;
       });
       summary += `\n`;
     }
@@ -382,13 +392,18 @@ export const TasksView: React.FC = () => {
                 const isHigh = task.priority === 'high';
                 const hasSubtasks = task.subtasks && task.subtasks.length > 0;
                 const completedSubCount = hasSubtasks ? task.subtasks.filter(s => s.completed).length : 0;
+                const subProgressPct = hasSubtasks ? Math.round((completedSubCount / task.subtasks.length) * 100) : 0;
                 const daysInfo = getDaysLeftInfo(task.dueDate, task.dueTime, language);
                 const isSnoozeOpen = activeSnoozeId === task.id;
 
                 return (
                   <article 
                     key={task.id}
-                    className="group relative bg-white dark:bg-slate-850 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800/80 hover:shadow-md transition-all flex flex-col gap-3 active:scale-[0.99]"
+                    className={`group relative bg-white dark:bg-slate-850 rounded-2xl p-4 shadow-sm border transition-all flex flex-col gap-3 active:scale-[0.99] ${
+                      task.isPinned 
+                        ? 'border-amber-300/80 dark:border-amber-600/50 bg-gradient-to-br from-amber-50/20 via-white to-white dark:from-amber-950/10 dark:via-slate-850 dark:to-slate-850 ring-1 ring-amber-400/20' 
+                        : 'border-slate-100 dark:border-slate-800/80 hover:shadow-md'
+                    }`}
                   >
                     <div className="flex items-start gap-3">
                       {/* Circle checkbox */}
@@ -406,16 +421,32 @@ export const TasksView: React.FC = () => {
 
                       {/* Content details */}
                       <div className="flex flex-col flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold ${
-                            isHigh 
-                              ? 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400' 
-                              : task.priority === 'medium' 
-                                ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400' 
-                                : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400'
-                          }`}>
-                            {getPriorityLabel(task.priority)}
-                          </span>
+                        <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            {task.isPinned && (
+                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                <Pin className="w-2.5 h-2.5 fill-amber-600 text-amber-600" />
+                                <span>PINNED</span>
+                              </span>
+                            )}
+
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold ${
+                              isHigh 
+                                ? 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400' 
+                                : task.priority === 'medium' 
+                                  ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-400' 
+                                  : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400'
+                            }`}>
+                              {getPriorityLabel(task.priority)}
+                            </span>
+
+                            {task.recurrence && task.recurrence !== 'none' && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                <Repeat className="w-2.5 h-2.5" />
+                                <span>{task.recurrence}</span>
+                              </span>
+                            )}
+                          </div>
 
                           {/* Days Left and Time Badges */}
                           <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -451,13 +482,36 @@ export const TasksView: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Interactive Subtasks mini bar */}
+                        {/* Custom Tags */}
+                        {task.tags && task.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {task.tags.map((tg, tIdx) => (
+                              <span 
+                                key={tIdx} 
+                                className="inline-flex items-center text-[9px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 px-1.5 py-0.5 rounded-md"
+                              >
+                                {tg}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Interactive Subtasks mini bar with Visual Progress */}
                         {hasSubtasks && (
-                          <div className="mt-3 bg-slate-50 dark:bg-slate-800 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
-                            <div className="flex justify-between text-[9px] font-bold text-slate-400 mb-1">
-                              <span>{t('subtasks_title')}</span>
-                              <span>{completedSubCount}/{task.subtasks.length} {t('subtasks_unit')}</span>
+                          <div className="mt-3 bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 mb-1.5">
+                              <span className="uppercase tracking-wider">{t('subtasks_title')}</span>
+                              <span>{completedSubCount}/{task.subtasks.length} ({subProgressPct}%)</span>
                             </div>
+
+                            {/* Subtask Linear Progress Bar */}
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 h-1 rounded-full mb-2 overflow-hidden">
+                              <div 
+                                className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                                style={{ width: `${subProgressPct}%` }}
+                              ></div>
+                            </div>
+
                             <div className="space-y-1.5">
                               {task.subtasks.map((sub, sIdx) => (
                                 <label 
@@ -501,8 +555,25 @@ export const TasksView: React.FC = () => {
                             )}
                           </div>
 
-                          {/* Quick Actions: Edit, Quick Snooze, Delete */}
-                          <div className="flex items-center gap-1">
+                          {/* Quick Actions: Pin, Snooze, Edit, Delete */}
+                          <div className="flex items-center gap-0.5">
+                            {/* Pin Button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTogglePin(task);
+                              }}
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                task.isPinned 
+                                  ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40' 
+                                  : 'text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                              }`}
+                              title={task.isPinned ? t('unpin_task') : t('pin_task')}
+                            >
+                              <Pin className={`w-3.5 h-3.5 ${task.isPinned ? 'fill-amber-500' : ''}`} />
+                            </button>
+
                             {/* Quick Snooze Popover */}
                             <div className="relative">
                               <button

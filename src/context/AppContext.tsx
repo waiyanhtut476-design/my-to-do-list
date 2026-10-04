@@ -52,6 +52,7 @@ interface AppContextType {
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   updateSettings: (updates: Partial<UserSetting>) => Promise<void>;
+  updateUserProfileName: (displayName: string) => Promise<void>;
   createNotification: (title: string, body: string, type: AppNotification['type']) => Promise<void>;
   markNotificationAsRead: (notificationId: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
@@ -498,6 +499,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // User Profile update
+  const updateUserProfileName = async (displayName: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { displayName });
+      setUserProfile(prev => prev ? { ...prev, displayName } : null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // In-App Notification Operations
   const createNotification = async (title: string, body: string, type: AppNotification['type']) => {
     if (!user) return;
@@ -581,6 +593,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateTask,
       deleteTask,
       updateSettings,
+      updateUserProfileName,
       createNotification,
       markNotificationAsRead,
       markAllNotificationsAsRead,

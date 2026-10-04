@@ -1,11 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Bell, Cloud, Trash2, ShieldAlert, Moon, Sun, Sparkles, Check, HelpCircle, Globe } from 'lucide-react';
+import { Bell, Cloud, Trash2, ShieldAlert, Moon, Sun, Sparkles, Check, HelpCircle, Globe, Download, Upload, User, Send, Database } from 'lucide-react';
 import { SettingsLanguageCards } from './LanguageSelector';
 
 export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, logout, user, theme, setTheme, t } = useApp();
+  const { 
+    settings, 
+    updateSettings, 
+    logout, 
+    user, 
+    userProfile, 
+    updateUserProfileName, 
+    tasks, 
+    createTask, 
+    createNotification, 
+    theme, 
+    setTheme, 
+    t 
+  } = useApp();
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(userProfile?.displayName || user?.displayName || '');
+  const [isSavingName, setIsSavingName] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!settings) return null;
 
@@ -37,6 +54,96 @@ export const SettingsView: React.FC = () => {
     showToast(t('toast_reset'));
   };
 
+  const handleSaveProfileName = async () => {
+    if (!editingName.trim()) return;
+    setIsSavingName(true);
+    await updateUserProfileName(editingName.trim());
+    setIsSavingName(false);
+    showToast(t('profile_updated_toast'));
+  };
+
+  // Export JSON Backup
+  const handleExportBackup = () => {
+    const backupData = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      user: {
+        email: user?.email,
+        displayName: userProfile?.displayName || user?.displayName
+      },
+      tasks: tasks.map(t => ({
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        priority: t.priority,
+        categoryId: t.categoryId,
+        dueDate: t.dueDate,
+        dueTime: t.dueTime,
+        subtasks: t.subtasks,
+        isPinned: t.isPinned,
+        tags: t.tags,
+        recurrence: t.recurrence
+      })),
+      settings
+    };
+
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clarity-flow-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(t('backup_copied_success'));
+  };
+
+  // Import JSON Backup
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        if (parsed && Array.isArray(parsed.tasks)) {
+          for (const taskData of parsed.tasks) {
+            await createTask({
+              title: taskData.title || 'Untitled Task',
+              description: taskData.description || '',
+              status: taskData.status || 'pending',
+              priority: taskData.priority || 'normal',
+              categoryId: taskData.categoryId || 'work',
+              dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
+              dueTime: taskData.dueTime || '09:30',
+              subtasks: taskData.subtasks || [],
+              isPinned: !!taskData.isPinned,
+              tags: taskData.tags || [],
+              recurrence: taskData.recurrence || 'none'
+            });
+          }
+          showToast(`นำเข้าสำเร็จ ${parsed.tasks.length} รายการ!`);
+        }
+      } catch (err) {
+        alert('ไฟล์สำรองไม่ถูกต้อง กรุณาเลือกไฟล์ .json ที่ถูกต้อง');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // Trigger real in-app test notification
+  const handleTestNotification = async () => {
+    await createNotification(
+      t('test_notif_title'),
+      t('test_notif_body'),
+      'system'
+    );
+    showToast(t('test_notif_title'));
+  };
+
   return (
     <div className="space-y-5 pb-8">
       {/* Settings Sub-header */}
@@ -65,7 +172,38 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Language Selection Card (Thai, English, Myanmar) */}
+      {/* 1. User Profile Customization Card */}
+      <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+            <User className="w-5.5 h-5.5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+              {t('edit_profile_name_label')}
+            </span>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                placeholder={userProfile?.displayName || user?.displayName || 'Your Name'}
+                className="text-sm font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 flex-1 text-slate-900 dark:text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleSaveProfileName}
+                disabled={isSavingName || !editingName.trim()}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
+              >
+                {t('save_profile_btn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Language Selection Card (Thai, English, Myanmar) */}
       <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-3.5">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
@@ -83,8 +221,8 @@ export const SettingsView: React.FC = () => {
         <SettingsLanguageCards />
       </div>
 
-      {/* Master Switch Card */}
-      <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800">
+      {/* 3. Master Notifications & Test Notification Card */}
+      <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
@@ -99,104 +237,90 @@ export const SettingsView: React.FC = () => {
               </span>
             </div>
           </div>
-          {/* iOS toggle */}
-          <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none mt-1">
+
+          <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
             <input 
-              type="checkbox"
+              type="checkbox" 
               checked={settings.notificationsEnabled}
               onChange={(e) => handleToggle('notificationsEnabled', e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-10 h-5.5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-indigo-600 shadow-inner"></div>
+            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
           </label>
+        </div>
+
+        {/* Test Notification Trigger Button */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <span className="text-xs text-slate-500 dark:text-slate-400">{t('test_notif_body')}</span>
+          <button
+            type="button"
+            onClick={handleTestNotification}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-colors cursor-pointer"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>{t('test_notif_btn')}</span>
+          </button>
         </div>
       </div>
 
-      {/* Theme Switcher (Light / Dark Mode) Card */}
-      <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-3.5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0 transition-colors ${
-              theme === 'dark' ? 'bg-indigo-600' : 'bg-amber-500'
-            }`}>
-              {theme === 'dark' ? <Moon className="w-5.5 h-5.5" /> : <Sun className="w-5.5 h-5.5" />}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-extrabold text-slate-900 dark:text-white">
-                {t('theme_section_title')}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-                {t('theme_section_desc')}
-              </span>
-            </div>
-          </div>
-
-          {/* Quick iOS toggle */}
-          <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none mt-1" title="Toggle Theme">
-            <input 
-              type="checkbox"
-              checked={theme === 'dark'}
-              onChange={(e) => handleThemeChange(e.target.checked ? 'dark' : 'light')}
-              className="sr-only peer"
-            />
-            <div className="w-10 h-5.5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-indigo-600 shadow-inner"></div>
-          </label>
+      {/* 4. Display Theme Selection Cards */}
+      <div className="space-y-2">
+        <div className="flex flex-col px-0.5">
+          <span className="text-sm font-extrabold text-slate-900 dark:text-white">
+            {t('theme_section_title')}
+          </span>
+          <span className="text-[11px] text-slate-400 leading-tight">
+            {t('theme_section_desc')}
+          </span>
         </div>
 
-        {/* 2 Visual Interactive Selection Buttons */}
-        <div className="grid grid-cols-2 gap-2 pt-1">
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          {/* Light Theme Card */}
           <button
             type="button"
             onClick={() => handleThemeChange('light')}
-            className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex flex-col p-4 rounded-2xl border text-left transition-all relative cursor-pointer ${
               theme === 'light'
-                ? 'bg-amber-50/70 dark:bg-slate-800 border-amber-400 text-amber-950 dark:text-white shadow-xs ring-2 ring-amber-400/40 scale-[1.01]'
-                : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-750 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/20 shadow-sm'
+                : 'border-slate-150 dark:border-slate-800 bg-white dark:bg-slate-850 hover:border-slate-300'
             }`}
           >
-            <div className="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <Sun className="w-4 h-4" />
-            </div>
-            <div className="text-center">
-              <span className="text-xs font-bold block">{t('theme_light')}</span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">{t('theme_light_desc')}</span>
-            </div>
             {theme === 'light' && (
-              <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 pt-0.5">
-                <Check className="w-3 h-3 stroke-[3]" /> Active
-              </span>
+              <span className="absolute top-3 right-3 w-4.5 h-4.5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
             )}
+            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center mb-2.5">
+              <Sun className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-extrabold text-slate-900 dark:text-white">{t('theme_light')}</span>
+            <span className="text-[10px] text-slate-400 mt-0.5 leading-snug">{t('theme_light_desc')}</span>
           </button>
 
+          {/* Dark Theme Card */}
           <button
             type="button"
             onClick={() => handleThemeChange('dark')}
-            className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex flex-col p-4 rounded-2xl border text-left transition-all relative cursor-pointer ${
               theme === 'dark'
-                ? 'bg-indigo-50/70 dark:bg-indigo-950/50 border-indigo-500 text-indigo-950 dark:text-white shadow-xs ring-2 ring-indigo-500/40 scale-[1.01]'
-                : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-750 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                ? 'border-indigo-600 bg-indigo-50/40 dark:bg-indigo-950/40 shadow-sm'
+                : 'border-slate-150 dark:border-slate-800 bg-white dark:bg-slate-850 hover:border-slate-300'
             }`}
           >
-            <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-              <Moon className="w-4 h-4" />
-            </div>
-            <div className="text-center">
-              <span className="text-xs font-bold block">{t('theme_dark')}</span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">{t('theme_dark_desc')}</span>
-            </div>
             {theme === 'dark' && (
-              <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 flex items-center gap-0.5 pt-0.5">
-                <Check className="w-3 h-3 stroke-[3]" /> Active
-              </span>
+              <span className="absolute top-3 right-3 w-4.5 h-4.5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
             )}
+            <div className="w-8 h-8 rounded-lg bg-indigo-950 text-indigo-400 flex items-center justify-center mb-2.5">
+              <Moon className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-extrabold text-slate-900 dark:text-white">{t('theme_dark')}</span>
+            <span className="text-[10px] text-slate-400 mt-0.5 leading-snug">{t('theme_dark_desc')}</span>
           </button>
         </div>
       </div>
 
-      {/* Advance Reminders Settings */}
-      <div className="space-y-2.5">
+      {/* 5. Early Reminders Setting */}
+      <div className="space-y-2">
         <div className="flex flex-col px-0.5">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('reminder_title')}</span>
+          <span className="text-sm font-extrabold text-slate-900 dark:text-white">{t('reminder_title')}</span>
           <span className="text-[11px] text-slate-400">{t('reminder_desc')}</span>
         </div>
 
@@ -239,7 +363,7 @@ export const SettingsView: React.FC = () => {
               <span className="text-[11px] font-semibold text-slate-500">{t('repeat_reminder')}</span>
               <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
                 <input 
-                  type="checkbox"
+                  type="checkbox" 
                   checked={settings.urgentReminderRepeat}
                   onChange={(e) => handleToggle('urgentReminderRepeat', e.target.checked)}
                   className="sr-only peer"
@@ -258,7 +382,52 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Cloud Sync & Account details */}
+      {/* 6. Data Backup & Export (JSON) */}
+      <div className="bg-white dark:bg-slate-850 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+            <Database className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-slate-900 dark:text-white block">
+              {t('backup_export_title')}
+            </span>
+            <span className="text-[10px] text-slate-400">
+              {t('backup_export_desc')}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={handleExportBackup}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>{t('backup_download_btn')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <span>{t('backup_import_btn')}</span>
+          </button>
+          
+          <input 
+            ref={fileInputRef}
+            type="file" 
+            accept=".json"
+            onChange={handleImportBackup} 
+            className="hidden" 
+          />
+        </div>
+      </div>
+
+      {/* 7. Cloud Sync & Account details */}
       <div className="bg-white dark:bg-slate-850 p-4 rounded-xl border border-slate-100 dark:border-slate-800 text-xs space-y-1.5">
         <span className="font-extrabold text-slate-700 dark:text-slate-300 block">{t('account_section_title')}</span>
         <p className="text-slate-500 dark:text-slate-400">
@@ -275,8 +444,6 @@ export const SettingsView: React.FC = () => {
           {t('logout_button')}
         </button>
       </div>
-
-
 
       {/* Global Toast component inline simulation */}
       {toastMessage && (

@@ -16,6 +16,9 @@ export interface Task {
   createdAt: any; // Timestamp
   updatedAt: any; // Timestamp
   subtasks: Subtask[];
+  isPinned?: boolean;
+  tags?: string[];
+  recurrence?: 'none' | 'daily' | 'weekly' | 'monthly';
 }
 
 export interface UserSetting {

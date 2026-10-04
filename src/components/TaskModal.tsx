@@ -19,7 +19,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  Edit3
+  Edit3,
+  Pin,
+  Repeat,
+  Tag,
+  Hash
 } from 'lucide-react';
 
 interface TaskModalProps {
@@ -40,6 +44,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
   const [priority, setPriority] = useState<'high' | 'medium' | 'normal'>('normal');
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
+  
+  // Pin, Recurrence, Tags state
+  const [isPinned, setIsPinned] = useState(false);
+  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+
   const [isListening, setIsListening] = useState(false);
   const [showVoiceSuccess, setShowVoiceSuccess] = useState(false);
 
@@ -65,6 +76,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
         setAllDay(!editingTask.dueTime);
         setPriority(editingTask.priority || 'normal');
         setSubtasks(editingTask.subtasks ? JSON.parse(JSON.stringify(editingTask.subtasks)) : []);
+        setIsPinned(!!editingTask.isPinned);
+        setRecurrence(editingTask.recurrence || 'none');
+        setTags(editingTask.tags ? [...editingTask.tags] : []);
         
         if (editingTask.dueDate) {
           const parts = editingTask.dueDate.split('-');
@@ -81,6 +95,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
         setAllDay(false);
         setPriority('normal');
         setSubtasks([]);
+        setIsPinned(false);
+        setRecurrence('none');
+        setTags([]);
         
         const d = initialDate ? new Date(initialDate) : new Date();
         if (!isNaN(d.getTime())) {
@@ -163,7 +180,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
   const isCurrentMonthToday = today.getFullYear() === pickerYear && today.getMonth() === pickerMonth;
   const todayDay = isCurrentMonthToday ? today.getDate() : null;
 
-  // Format date display label for active language (Thai, English, Myanmar)
+  // Format date display label for active language
   const formattedDueDate = formatShortDate(dueDate, language) || t('select_date');
 
   if (!isOpen) return null;
@@ -184,6 +201,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
     setSubtasks(updated);
   };
 
+  const handleAddTag = () => {
+    let cleanTag = tagInput.trim();
+    if (!cleanTag) return;
+    if (!cleanTag.startsWith('#')) cleanTag = '#' + cleanTag;
+    if (!tags.includes(cleanTag)) {
+      setTags([...tags, cleanTag]);
+    }
+    setTagInput('');
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter(t => t !== tagToRemove));
+  };
+
   const handleClose = () => {
     setEditingTask(null);
     onClose();
@@ -193,26 +224,25 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
     e.preventDefault();
     if (!title.trim()) return;
 
+    const payload = {
+      title: title.trim(),
+      description: description.trim(),
+      priority,
+      categoryId: category,
+      dueDate: dueDate,
+      dueTime: allDay ? '' : dueTime,
+      subtasks,
+      isPinned,
+      recurrence,
+      tags
+    };
+
     if (editingTask) {
-      await updateTask(editingTask.id, {
-        title: title.trim(),
-        description: description.trim(),
-        priority,
-        categoryId: category,
-        dueDate: dueDate,
-        dueTime: allDay ? '' : dueTime,
-        subtasks
-      });
+      await updateTask(editingTask.id, payload);
     } else {
       await createTask({
-        title: title.trim(),
-        description: description.trim(),
-        status: 'pending',
-        priority,
-        categoryId: category,
-        dueDate: dueDate,
-        dueTime: allDay ? '' : dueTime,
-        subtasks
+        ...payload,
+        status: 'pending'
       });
     }
 
@@ -222,6 +252,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
     setCategory('work');
     setPriority('normal');
     setSubtasks([]);
+    setIsPinned(false);
+    setRecurrence('none');
+    setTags([]);
     setEditingTask(null);
     onClose();
   };
@@ -320,9 +353,27 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
 
           {/* Title Input */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-              {mode === 'task' ? t('title_label_task') : t('title_label_meeting')} <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                {mode === 'task' ? t('title_label_task') : t('title_label_meeting')} <span className="text-red-500">*</span>
+              </label>
+
+              {/* Pin to top toggle */}
+              <button
+                type="button"
+                onClick={() => setIsPinned(!isPinned)}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  isPinned 
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800' 
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+                title={t('pin_to_top_switch')}
+              >
+                <Pin className={`w-3.5 h-3.5 ${isPinned ? 'fill-amber-600 text-amber-600' : ''}`} />
+                <span>{isPinned ? t('pinned_section') : t('pin_to_top_switch')}</span>
+              </button>
+            </div>
+
             <div className="relative flex items-center bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 px-3.5 py-1 transition-all">
               <input
                 type="text"
@@ -360,11 +411,29 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
             />
           </div>
 
-          {/* Category Chips */}
-          <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              {t('category_title')}
-            </label>
+          {/* Category Chips & Recurrence */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                {t('category_title')}
+              </label>
+
+              {/* Recurrence Dropdown */}
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">
+                <Repeat className="w-3 h-3 text-slate-400" />
+                <select
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value as any)}
+                  className="bg-transparent border-none text-[11px] font-bold text-slate-700 dark:text-slate-300 p-0 focus:ring-0 outline-none cursor-pointer"
+                >
+                  <option value="none" className="bg-white dark:bg-slate-800">{t('recurrence_none')}</option>
+                  <option value="daily" className="bg-white dark:bg-slate-800">{t('recurrence_daily')}</option>
+                  <option value="weekly" className="bg-white dark:bg-slate-800">{t('recurrence_weekly')}</option>
+                  <option value="monthly" className="bg-white dark:bg-slate-800">{t('recurrence_monthly')}</option>
+                </select>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
               {[
                 { id: 'work', label: t('cat_work'), icon: '🏢' },
@@ -513,7 +582,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
                     </div>
 
                     {/* Native Date Picker Fallback */}
-                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-750 flex items-center justify-between text-[11px]">
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-755 flex items-center justify-between text-[11px]">
                       <span className="text-slate-400">{t('or_type_date')}</span>
                       <input
                         ref={nativeDateInputRef}
@@ -671,6 +740,51 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, initialDa
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Custom Tags Section */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              {t('tag_label')}
+            </label>
+            <div className="flex flex-wrap gap-1.5 items-center">
+              {tags.map((tag, idx) => (
+                <span 
+                  key={idx} 
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/80 rounded-lg text-xs font-bold"
+                >
+                  <span>{tag}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => handleRemoveTag(tag)}
+                    className="text-slate-400 hover:text-red-500 ml-0.5 cursor-pointer"
+                  >
+                    &times;
+                  </button>
+                </span>
+              ))}
+
+              <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                <Hash className="w-3 h-3 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder={t('add_tag_placeholder')}
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                  className="bg-transparent border-none p-0 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:ring-0 outline-none w-36"
+                />
+                {tagInput.trim() && (
+                  <button 
+                    type="button" 
+                    onClick={handleAddTag} 
+                    className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 cursor-pointer"
+                  >
+                    +
+                  </button>
+                )}
               </div>
             </div>
           </div>
