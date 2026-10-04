@@ -49,7 +49,8 @@ function AppContent() {
     activeProjectId,
     saveCustomFirebaseConfig,
     clearCustomFirebaseConfig,
-    signIn
+    signIn,
+    theme
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'tasks' | 'calendar' | 'analytics' | 'settings'>('tasks');
@@ -183,7 +184,7 @@ function AppContent() {
   // Render Login Landing Page when logged out
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white flex flex-col justify-between py-6 px-6">
+      <div className={`min-h-screen ${theme === 'dark' ? 'dark bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'} flex flex-col justify-between py-6 px-6`}>
         {/* Top Header Logo */}
         <div className="flex items-center gap-2 justify-center max-w-sm w-full mx-auto">
           <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/35">
@@ -456,7 +457,7 @@ function AppContent() {
 
   // Render Logged-In Application Core
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white pb-28">
+    <div className={`min-h-screen ${theme === 'dark' ? 'dark bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'} pb-28`}>
       {/* 1. Universal Top Header Bar (Fixed) */}
       <header className="fixed top-0 inset-x-0 z-40 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800/80 pt-safe">
         <div className="h-20 px-4 max-w-md mx-auto flex items-center justify-between gap-3">

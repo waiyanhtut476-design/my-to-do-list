@@ -51,6 +51,9 @@ interface AppContextType {
   markNotificationAsRead: (notificationId: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
   clearNotification: (notificationId: string) => Promise<void>;
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => Promise<void>;
+  toggleTheme: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -65,6 +68,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState<boolean>(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
+
+  // LocalStorage Theme Management
+  const [theme, setAppTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('clarity_flow_theme');
+      if (saved === 'dark' || saved === 'light') {
+        return saved;
+      }
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch (e) {
+      return 'light';
+    }
+  });
 
   // Configuration Info
   const [isUsingCustomConfig, setIsUsingCustomConfig] = useState<boolean>(() => {
@@ -264,14 +280,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [user]);
 
-  // Sync Dark Mode state to HTML root
-  useEffect(() => {
-    if (settings) {
-      if (settings.darkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
+  const setTheme = async (newTheme: 'light' | 'dark') => {
+    setAppTheme(newTheme);
+    try {
+      localStorage.setItem('clarity_flow_theme', newTheme);
+    } catch (e) {
+      console.error('Failed to save theme in localStorage', e);
+    }
+
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.body?.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body?.classList.remove('dark');
+    }
+
+    // Also sync to user_settings in Firestore if user is logged in
+    if (user) {
+      try {
+        await updateSettings({ darkMode: newTheme === 'dark' });
+      } catch (err) {
+        console.error('Failed to sync darkMode to Firestore:', err);
       }
+    }
+  };
+
+  const toggleTheme = async () => {
+    await setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  // Ensure DOM class matches theme state on mount and update
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.body?.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body?.classList.remove('dark');
+    }
+  }, [theme]);
+
+  // Sync settings.darkMode from Firestore if loaded
+  useEffect(() => {
+    if (settings && typeof settings.darkMode === 'boolean') {
+      const dbTheme = settings.darkMode ? 'dark' : 'light';
+      try {
+        const local = localStorage.getItem('clarity_flow_theme');
+        if (!local) {
+          localStorage.setItem('clarity_flow_theme', dbTheme);
+          setAppTheme(dbTheme);
+        }
+      } catch (e) {}
     }
   }, [settings]);
 
@@ -368,10 +428,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const safeUpdates = { ...updates };
       delete safeUpdates.ownerId;
 
-      await updateDoc(doc(db, 'user_settings', user.uid), {
+      await setDoc(doc(db, 'user_settings', user.uid), {
         ...safeUpdates,
+        ownerId: user.uid,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -459,7 +520,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createNotification,
       markNotificationAsRead,
       markAllNotificationsAsRead,
-      clearNotification
+      clearNotification,
+      theme,
+      setTheme,
+      toggleTheme
     }}>
       {children}
     </AppContext.Provider>

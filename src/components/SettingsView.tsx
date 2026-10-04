@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Bell, Cloud, Trash2, ShieldAlert, Moon, Play, Lightbulb, Check, HelpCircle } from 'lucide-react';
+import { Bell, Cloud, Trash2, ShieldAlert, Moon, Sun, Sparkles, Check, HelpCircle } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
-  const { settings, updateSettings, logout, user } = useApp();
+  const { settings, updateSettings, logout, user, theme, setTheme } = useApp();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   if (!settings) return null;
@@ -20,13 +20,16 @@ export const SettingsView: React.FC = () => {
     showToast('บันทึกการเปลี่ยนแปลงแล้ว');
   };
 
+  const handleThemeChange = async (newTheme: 'light' | 'dark') => {
+    await setTheme(newTheme);
+    showToast(newTheme === 'dark' ? 'สลับเป็นโหมดมืดเรียบร้อยแล้ว' : 'สลับเป็นโหมดสว่างเรียบร้อยแล้ว');
+  };
+
   const handleReset = async () => {
+    await setTheme('light');
     await updateSettings({
       darkMode: false,
       notificationsEnabled: true,
-      dndEnabled: false,
-      dndStartTime: '22:00',
-      dndEndTime: '07:00',
       earlyReminderMinutes: 30,
       urgentReminderRepeat: true
     });
@@ -84,30 +87,87 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Dark Mode Switch Card */}
-      <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800">
+      {/* Theme Switcher (Light / Dark Mode) Card */}
+      <div className="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-850 p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-sm shrink-0">
-              <Moon className="w-5.5 h-5.5" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0 transition-colors ${
+              theme === 'dark' ? 'bg-indigo-600' : 'bg-amber-500'
+            }`}>
+              {theme === 'dark' ? <Moon className="w-5.5 h-5.5" /> : <Sun className="w-5.5 h-5.5" />}
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-extrabold text-slate-900 dark:text-white">เปิดโหมดมืด (Dark Mode)</span>
+              <span className="text-sm font-extrabold text-slate-900 dark:text-white">โหมดการแสดงผล (Theme)</span>
               <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-                เปลี่ยนหน้าจอเป็นสีมืดเพื่อความสบายตาในการเคลียร์งานตอนกลางคืน
+                ปรับโทนสีหน้าจอให้เหมาะสมกับสภาพแวดล้อม เพื่อความสบายตาในการใช้งาน
               </span>
             </div>
           </div>
-          {/* iOS toggle */}
-          <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none mt-1">
+
+          {/* Quick iOS toggle */}
+          <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none mt-1" title="สลับโหมดมืด/สว่าง">
             <input 
               type="checkbox"
-              checked={settings.darkMode}
-              onChange={(e) => handleToggle('darkMode', e.target.checked)}
+              checked={theme === 'dark'}
+              onChange={(e) => handleThemeChange(e.target.checked ? 'dark' : 'light')}
               className="sr-only peer"
             />
             <div className="w-10 h-5.5 bg-slate-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-indigo-600 shadow-inner"></div>
           </label>
+        </div>
+
+        {/* 2 Visual Interactive Selection Buttons */}
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => handleThemeChange('light')}
+            className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+              theme === 'light'
+                ? 'bg-amber-50/70 dark:bg-slate-800 border-amber-400 text-amber-950 dark:text-white shadow-xs ring-2 ring-amber-400/40 scale-[1.01]'
+                : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-750 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <div className="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <Sun className="w-4 h-4" />
+            </div>
+            <div className="text-center">
+              <span className="text-xs font-bold block">โหมดสว่าง (Light)</span>
+              <span className="text-[10px] text-slate-400 block mt-0.5">สบายตาในที่แจ้ง</span>
+            </div>
+            {theme === 'light' && (
+              <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 pt-0.5">
+                <Check className="w-3 h-3 stroke-[3]" /> กำลังใช้งาน
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleThemeChange('dark')}
+            className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+              theme === 'dark'
+                ? 'bg-indigo-50/70 dark:bg-indigo-950/50 border-indigo-500 text-indigo-950 dark:text-white shadow-xs ring-2 ring-indigo-500/40 scale-[1.01]'
+                : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-750 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+              <Moon className="w-4 h-4" />
+            </div>
+            <div className="text-center">
+              <span className="text-xs font-bold block">โหมดมืด (Dark)</span>
+              <span className="text-[10px] text-slate-400 block mt-0.5">ถนอมสายตาตอนกลางคืน</span>
+            </div>
+            {theme === 'dark' && (
+              <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 flex items-center gap-0.5 pt-0.5">
+                <Check className="w-3 h-3 stroke-[3]" /> กำลังใช้งาน
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 pt-0.5">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+          <span>ระบบจดจำธีมที่คุณเลือกไว้โดยอัตโนมัติในทุกครั้งที่เปิดใช้งาน</span>
         </div>
       </div>
 
